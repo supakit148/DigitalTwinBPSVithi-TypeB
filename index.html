@@ -1,0 +1,4766 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Sci-Fi City Dashboard</title>
+  <script src="https://static.sketchfab.com/api/sketchfab-viewer-1.12.0.js"></script>
+  <script src="https://cdn.plot.ly/plotly-latest.min.js"></script>
+  <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --panel: rgba(10, 10, 25, 0.5);
+      --glow: #00ffffaa;
+      --blur: blur(20px);
+      --radius: 14px;
+      --text: #ffffff;
+      --neon: 0 0 8px #0ff, 0 0 16px #0ff;
+      --neon2:#64f3ff;                          /* light neon */
+      
+      --gap: 12px;
+      --card-w: clamp(180px, 20vw, 280px);
+      --ratio: 16/9;
+      --bottom-cam-h: 28vh;                         /* สูงจอล่าง ปรับได้ */
+      --safe-bottom: calc(var(--bottom-cam-h) + 36px);  /* กันพื้นที่ให้คอลัมน์/ปุ่ม */
+      
+      --top-h: 64px;     /* ความสูง .top */
+      --left-w: 320px;   /* ความกว้าง .left */
+      --right-w: 300px;  /* ความกว้างที่กินจริงของ .right */
+    }
+
+    html, body {
+      margin: 0;
+      padding: 0;
+      min-height: 100vh;  /* ✅ ครอบเต็ม viewport */
+      width: 100%;
+      overflow: hidden;
+      background: #000;
+      font-family: 'Orbitron', sans-serif;
+      font-variant-numeric: tabular-nums; /* ✅ เพิ่มบรรทัดนี้ */
+      color: var(--text);
+    }
+
+    .layout {
+      display: flex;
+      height: auto;
+      min-height: 100vh;   /* ✅ ไม่ fix ตายตัว แต่ขยายได้ */
+      width: 100vw;
+      position: relative;
+    }
+
+    .background iframe {
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100vw;
+      height: 100vh;
+      z-index: 0;
+      border: none;
+      margin: 0;
+      padding: 0;
+    }
+
+    .top {
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 64px;
+      background: linear-gradient(to right, rgba(0, 255, 255, 0.1), rgba(0, 0, 0, 0.4));
+      backdrop-filter: var(--blur);
+      z-index: 3;
+      border-bottom: 1px solid var(--glow);
+      box-shadow: inset 0 -1px 0 var(--glow);
+    }
+
+    .top-left {
+      position: absolute;
+      left: 28px;
+      top: 50%;
+      transform: translateY(-50%);
+    }
+
+    .top-right {
+      position: absolute;
+      right: 20px;
+      top: 50%;
+      transform: translateY(-50%);
+    }
+
+    .dashboard-title {
+      font-size: 35px;
+      font-weight: 600;
+      color: var(--text);
+      text-shadow: 0 0 6px #0ff;
+      white-space: nowrap;
+    }
+
+    .top-center {
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      height: 100%;
+    }
+
+    .ios-clock {
+      position: absolute;
+      top: 68px;
+      left: 50%;
+      transform: translateX(-50%);
+      text-align: center;
+      z-index: 4;
+    }
+
+    .ios-clock .date {
+      font-size: 35px;
+      color: #ccc;
+      font-weight: 300;
+      text-shadow: 0 0 8px rgba(255,255,255,0.15);
+    }
+
+    .ios-clock .clock {
+      font-size: 70px;
+      font-weight: 200;
+      color: #fff;
+      letter-spacing: -0.5px;
+      text-shadow: 0 0 18px rgba(255,255,255,0.25);
+    }
+
+    .ios-clock .clock span {
+      font-variant-numeric: tabular-nums;
+    }
+
+    .menu-buttons {
+      display: flex;
+      gap: 12px;
+    }
+
+    .top button {
+      background: transparent;
+      border: 1px solid var(--glow);
+      color: var(--text);
+      padding: 10px 18px;
+      border-radius: var(--radius);
+      font-weight: bold;
+      font-size: 14px;
+      cursor: pointer;
+      text-shadow: var(--neon);
+      transition: all 0.3s ease;
+    }
+
+    .top button:hover {
+      background: var(--glow);
+      color: #000;
+      box-shadow: 0 0 18px var(--glow);
+    }
+
+    .menu-buttons button.highlight {
+      background: var(--glow);
+      color: #000;
+      box-shadow: 0 0 18px var(--glow);
+    }
+
+
+    .left, .right {
+      position: absolute;
+      top: 35px;
+      width: 320px;
+      height: calc(100vh - 0px);
+      /* ทำให้โปร่งใส/ไม่มีพื้นและเงาขอบ */
+      background: transparent !important;
+      backdrop-filter: none !important;
+      border: none !important;
+      box-shadow: none !important;
+
+      padding: 0px;
+      z-index: 2;
+      overflow-y: hidden;
+    }
+
+    /* ตำแหน่งซ้าย/ขวา */
+    .left { left: 0; }
+    .right { right: -20px; }
+
+
+    .card {
+      background: rgba(20, 20, 20, 0.6); /* พื้นเข้มโปร่งใส */
+      backdrop-filter: blur(12px);       /* เบลอพื้นหลัง มัวๆ */
+      -webkit-backdrop-filter: blur(12px);
+      border-radius: 16px;               /* มุมโค้งมน */
+      border: 1px solid rgba(255, 255, 255, 0.08); /* ขอบโปร่งบางๆ */
+      box-shadow: 0 8px 20px rgba(0, 0, 0, 0.4);   /* เงานุ่มลึก */
+      padding: 16px;
+      color: #e0e0e0;                    /* ตัวอักษรสีเทาอ่อน อ่านง่ายบนพื้นเข้ม */
+      transition: transform 0.3s ease, box-shadow 0.3s ease;
+    }
+
+    /* ใส่ effect ตอน hover ให้ล้ำขึ้น */
+    .card:hover {
+      transform: translateY(-4px);
+      box-shadow: 0 12px 28px rgba(0, 0, 0, 0.6);
+    }
+
+    .card::before {
+      content: "";
+      position: absolute;
+      inset: 0;
+      padding: 1px;
+      border-radius: var(--radius);
+      background: linear-gradient(145deg, #00ffff55, #00000022);
+      -webkit-mask: 
+        linear-gradient(#fff 0 0) content-box, 
+        linear-gradient(#fff 0 0);
+      -webkit-mask-composite: xor;
+      mask-composite: exclude;
+      pointer-events: none;
+    }
+
+    h2, h3 {
+      text-shadow: var(--neon);
+      font-size: 18px;
+    }
+
+    ul {
+      padding-left: 20px;
+      list-style: none;
+    }
+
+    ul li::before {
+      content: '\25B8';
+      color: var(--glow);
+      margin-right: 6px;
+    }
+
+    .audio-bars-container {
+      position: fixed;
+      bottom: 0;
+      left: 0;
+      width: 100%;
+      height: 100px;
+      background: transparent;
+      pointer-events: none;
+      z-index: 5;
+    }
+
+    .audio-bars-container .bars {
+      position: absolute;
+      bottom: 0;
+      left: 50%;
+      transform: translateX(calc(-50% + 7px)) rotate(180deg);
+      display: flex;
+      gap: 3px;
+    }
+
+    .audio-bars-container .bar {
+      width: 4px;
+      height: 10px;
+      background: #00ffff;
+      opacity: 0.5;
+      border-radius: 2px;
+      transition: height 0.4s ease;
+    }
+
+    .electrical-grid {
+      display: grid;
+      grid-template-columns: repeat(2, 1fr);
+      gap: 18px;             /* ✅ เพิ่มความห่างระหว่างช่อง */
+      width: 100%;
+      box-sizing: border-box;
+    }
+
+    .electrical-grid .metric {
+      background: rgba(255, 255, 255, 0.08);
+      border-radius: 12px;
+      padding: 14px 8px;
+      text-align: center;
+      min-width: 100px;
+      min-height: 80px; /* ✅ เพิ่มความสูงขั้นต่ำ */
+      display: flex;
+      flex-direction: column;
+      justify-content: center;   /* ✅ จัดให้อยู่ตรงกลาง */
+      box-shadow: 0 0 10px #0ff4, inset 0 0 8px rgba(255, 255, 255, 0.1);
+      transition: transform 0.2s ease;
+    }
+    .electrical-grid .metric:hover {
+      transform: scale(1.03);
+    }
+
+    .electrical-grid .metric strong {
+      font-size: 13px;               /* ✅ ลดขนาด font นิดหน่อย */
+      white-space: nowrap;           /* ✅ ไม่ให้พับ */
+      overflow: hidden;
+      text-overflow: ellipsis;
+      display: block;
+      margin-bottom: 6px;
+      color: #0ff;
+    }
+
+    .electrical-grid .metric div {
+      font-size: 20px;
+      font-weight: 600;
+      overflow-wrap: break-word;
+      word-break: break-word;
+      font-variant-numeric: tabular-nums;
+    }
+
+    @media (max-width: 600px) {
+      .electrical-grid {
+        grid-template-columns: 1fr;
+      }
+    }
+
+    /* Fade-in/out glass modal */
+    .glass-modal {
+      position: fixed;
+      top: var(--top-h);               /* เริ่มใต้ .top */
+      left: var(--left-w);             /* เริ่มหลัง .left */
+      right: var(--right-w);           /* ก่อน .right */
+      bottom: var(--safe-bottom);      /* เหนือ frame ล่าง */
+    
+      width: auto;
+      height: auto;
+      transform: none; /* ยกเลิก translate เดิม */
+    
+      background: rgba(0,0,0,0.65);
+      backdrop-filter: blur(20px);
+      border-radius: 16px;
+      box-shadow: 0 0 25px #00ffffaa;
+      z-index: 20000 !important;
+      opacity: 0;
+      pointer-events: none;
+      transition: opacity 0.5s ease;
+      overflow: hidden;
+    }
+    .glass-modal.active {
+      opacity: 1;
+      pointer-events: auto;
+    }
+
+    .glass-content {
+      background: rgba(0, 0, 0, 0.6);
+      padding: 24px;
+      border-radius: 16px;
+      width: 90vw;
+      max-width: 1280px;
+      height: 90vh;
+      box-shadow: 0 0 30px #0ff;
+      position: relative;
+    }
+
+    .close-btn {
+      position: absolute;
+      top: 12px;
+      right: 12px;
+      background: #0ff;
+      color: #000;
+      border: none;
+      border-radius: 8px;
+      font-weight: bold;
+      padding: 8px 16px;
+      cursor: pointer;
+    }
+
+
+    @keyframes fadeIn {
+      0% {
+        transform: scale(0.92);
+        opacity: 0;
+      }
+      100% {
+        transform: scale(1);
+        opacity: 1;
+      }
+    }
+
+    .glass-modal {
+      position: fixed;
+      top: 70px;
+      left: 51.5%;
+      transform: translateX(-50%);
+      width: 90vw;                /* กว้างเท่าเดิม */
+      max-width: 1900px;
+      height: 82vh;               /* ✅ เพิ่มความสูงมากขึ้น */
+      max-height: 1260px;
+      background: rgba(0, 0, 0, 0.65);
+      backdrop-filter: blur(20px);
+      border-radius: 16px;
+      box-shadow: 0 0 25px #00ffffaa;
+      z-index: 10;
+      opacity: 0;
+      pointer-events: none;
+      transition: opacity 0.5s ease;
+      overflow: hidden;
+    }
+
+    .glass-modal.active {
+      opacity: 1;
+      pointer-events: auto;
+    }
+
+    .glass-modal .close-btn {
+      position: absolute;
+      top: 12px;
+      right: 12px;
+      background: #0ff;
+      color: #000;
+      font-weight: bold;
+      border: none;
+      border-radius: 8px;
+      padding: 8px 16px;
+      cursor: pointer;
+      z-index: 20;
+    }
+    
+    /* === Frame ของโมดัลกล้อง === */
+    .glass-modal-cctv {
+      position: fixed;
+      top: 220px;
+      right: 500px;
+    
+      /* กรอบขนาดพอดีกับรูป */
+      display: inline-block;
+      width: auto;
+      height: auto;
+    
+      /* Glass effect */
+      background: rgba(255, 255, 255, 0.08);
+      backdrop-filter: blur(12px) saturate(150%);
+      -webkit-backdrop-filter: blur(12px) saturate(150%);
+      border: 1px solid rgba(255, 255, 255, 0.2);
+    
+      /* ให้ขอบโค้งที่ container ไปเลย */
+      border-radius: 16px;
+      box-shadow: 0 4px 30px rgba(0, 0, 0, 0.3);
+    
+      /* ❌ ไม่ต้องมี padding ไม่งั้นกรอบใหญ่กว่ารูป */
+      padding: 0;     
+    
+      display: none;
+      z-index: 9999;
+      overflow: hidden;  /* ให้ภาพไม่ล้น */
+    }
+    
+    .glass-modal-cctv.active {
+      display: inline-block;
+    }
+    
+    .glass-modal-cctv img {
+      display: block;     /* ตัดช่องว่างใต้รูป */
+      width: 300px;       /* ✅ ล็อกที่ 300px */
+      height: auto;
+      border-radius: 0;   /* ใช้ border-radius จาก container แทน */
+    }
+
+    
+    /* ปุ่มปิดยังใช้ตำแหน่งเดิมได้ */
+    .glass-modal-cctv .close-btn {
+      position: absolute;
+      top: 8px;
+      right: 8px;
+      z-index: 2;
+    }
+
+
+    .scrolling-wrapper {
+      position: relative;
+      height: 100%;
+      overflow: hidden;
+    }
+
+    .scrolling-content {
+      position: absolute;
+      width: 100%;
+      animation: scroll-up-down-right 300s ease-in-out infinite;
+    }
+    
+    .scrolling-content-left {
+      position: absolute;
+      width: 100%;
+      animation: scroll-up-down-left 300s ease-in-out infinite;
+    }
+    
+    .camera-image img {
+        display: block; 
+        margin-left: auto; 
+        margin-right: auto;
+        width: 100%;
+        height: auto;
+        border-radius: 8px;
+        border: 1px solid #00eaff;
+        box-shadow: 0 0 12px #00eaff66;
+        margin-bottom: 8px;
+        transition: transform 0.3s ease;
+    }
+    
+    .camera-image img:hover {
+        transform: scale(1.03);
+    }
+
+    @keyframes scroll-up-down-left {
+      0%   { transform: translateY(0); }
+      25%  { transform: translateY(-1150px); }
+      50%  { transform: translateY(0); }
+      75%  { transform: translateY(-1150px); }
+      100% { transform: translateY(0); }
+    }
+
+    @keyframes scroll-up-down-right {
+      0%   { transform: translateY(0); }
+      25%  { transform: translateY(-1900px); }
+      50%  { transform: translateY(0); }
+      75%  { transform: translateY(-1900px); }
+      100% { transform: translateY(0); }
+    }
+    
+      #groupedBar {
+        width: 100%;
+        height: 280px;          /* ปรับความสูงตามต้องการ */
+      }
+      @media (min-width: 1360px) {
+        #groupedBar { height: 320px; }
+      }
+      
+    #pie {
+      width: 80%;
+      height: 80%;
+      box-shadow: 0 0 20px #00ffffaa;
+      border-radius: 12px;
+      background: rgba(0,0,0,0.4);
+      backdrop-filter: blur(12px);
+      padding: 8px;
+    }
+    
+    select, button { background:#000; color:#0ff; border:1px solid #0ff; padding:6px 12px; border-radius:6px; cursor:pointer; }
+    select option { background:#000; color:#0ff; }
+    #dashboard3D { width:100%; height:95vh; }
+    #legendToggle { margin-left: auto; }
+    
+      /* === 3D Model แบบเต็มจอ === */
+      #skfb-frame{
+        position:fixed; inset:0;
+        width:100vw; height:100vh; border:none;
+        filter: drop-shadow(0 0 20px #00eaff);
+        z-index: 1; /* อยู่ใต้ overlay ทั้งหมด */
+      }
+    
+    .cctv-col-left, .cctv-col-right, .cctv-col-center{
+      position: fixed;
+      top: 340px;  /*ของเดิม ถ้ามี Bottom top: 170px;*/
+      display: flex;
+      flex-direction: column;
+      gap: var(--gap);
+      z-index: 10000;
+      pointer-events: none; /* คลิกทะลุ ยกเว้นตัวการ์ด */
+    }
+    
+    /* เพิ่มขนาดสำหรับกล้องกลาง */
+    .cctv-col-center .glass-card {
+      width: calc(var(--card-w) * 1.5); /* กล้องกลางใหญ่ขึ้น 1.5 เท่า */
+      aspect-ratio: var(--ratio);       /* ยังคงอัตราส่วนภาพเดิม */
+    }
+    
+    .cctv-col-left { left: 340px; }
+    .cctv-col-center { top: 50%; left: 50%; }
+    .cctv-col-right{ right: 300px; }
+    
+    .glass-card{
+      position: relative;
+      width: var(--card-w);
+      aspect-ratio: var(--ratio);
+      background: rgba(255,255,255,0.08);
+      border: 1px solid rgba(255,255,255,0.25);
+      border-radius: 16px;
+      overflow: hidden;
+      box-shadow: 0 8px 22px rgba(0,0,0,.35);
+      pointer-events: auto;
+    }
+    
+    .glass-card img{
+      width: 100%; height: 100%;
+      object-fit: cover;
+      display: block;
+    }
+    
+    .glass-card h3{
+      position: absolute;
+      top: 6px; right: 6px;
+      margin: 0; padding: 4px 8px;
+      background: rgba(0,0,0,.55);
+      color: #00fff3;
+      font: 700 12px/1 'Orbitron', sans-serif;
+      border-radius: 8px;
+    }
+    
+    .glass-card h32{
+      position: absolute;
+      bottom: 6px; left: 6px;
+      margin: 0; padding: 4px 8px;
+      background: rgba(0,0,0,.55);
+      color: #00fff3;
+      font: 700 12px/1 'Orbitron', sans-serif;
+      border-radius: 8px;
+    }
+    
+    /* Responsive */
+    @media (max-width: 1200px){
+      :root{ --card-w: clamp(160px, 28vw, 240px); }
+    }
+    @media (max-width: 768px){
+      .cctv-col-left, .cctv-col-right, .cctv-col-center{
+        flex-direction: row; /* จอเล็ก → จัดเรียงเป็นแถวแทน */
+        bottom: var(--safe-bottom);
+        top: auto;
+      }
+    }
+    
+/* === PS5-like Glass Card ================================== */
+.floor-card{
+  width: 240px; height: 120px;
+  position: relative; overflow: hidden;
+  border-radius: 16px;
+
+  /* Glass effect */
+  background:
+    linear-gradient(180deg, rgba(255,255,255,.12), rgba(255,255,255,.06)),
+    rgba(255,255,255,.06);
+  border: 1px solid rgba(255,255,255,.22);
+  backdrop-filter: blur(16px) saturate(160%);
+  -webkit-backdrop-filter: blur(16px) saturate(160%);
+
+  /* Shadow + neon glow */
+  box-shadow:
+    0 18px 30px rgba(0,0,0,.40),
+    inset 0 1px 0 rgba(255,255,255,.25),
+    0 0 26px rgba(0,246,255,.18);
+
+  display:flex; flex-direction:column;
+  justify-content:center; align-items:flex-end;
+  padding: 18px 24px;
+  transition: transform .35s ease, box-shadow .35s ease, border-color .35s ease;
+}
+
+/* ✨ Neon top bar (flow animation) */
+.floor-card::before{
+  content:"";
+  position:absolute; left:0; right:0; top:0; height:40px;
+  background: linear-gradient(270deg, #00f6ff, #9b4dff, #00f6ff);
+  background-size: 280% 100%;
+  animation: barFlow 7s ease-in-out infinite;
+  box-shadow: 0 0 12px rgba(0,246,255,.65), 0 0 20px rgba(155,77,255,.45);
+  border-top-left-radius:16px; border-top-right-radius:16px;
+  opacity:.9;
+}
+
+/* Glass reflection highlight */
+.floor-card::after{
+  content:"";
+  position:absolute; inset:-20% -10% auto -10%;
+  height:70%;
+  background:
+    radial-gradient(120% 70% at 15% -30%,
+      rgba(255,255,255,.38), rgba(255,255,255,.10) 40%, transparent 70%);
+  pointer-events:none;
+  mix-blend-mode:screen;
+}
+
+/* Sheen light */
+.floor-card .sheen{
+  position:absolute; inset:-40% -50% -40% -50%;
+  background: linear-gradient(120deg,
+    transparent 40%,
+    rgba(255,255,255,.20) 50%,
+    transparent 60%);
+  transform: translateX(-30%);
+  animation: sheen 4.5s ease-in-out infinite;
+  pointer-events:none;
+  mix-blend-mode:screen;
+  opacity:.55;
+}
+
+/* Text */
+.label{
+  font-size:18px; letter-spacing:2px;
+  color:#cfefff; opacity:.85;
+  align-self:flex-start;
+  position:relative; top:-10px;
+}
+.number {
+  font-size: 45px; font-weight: 900;
+  color: #00f6ff;
+  text-shadow: 0 0 12px #00f6ff, 0 0 28px #9b4dff;
+  display: inline-block;      /* เพื่อให้ translate ทำงานชัวร์ */
+  transform: translateY(18px); /* 👈 เลื่อนลง ~6px (ปรับค่าตามชอบ) */
+  /* หรือถ้าชอบแบบง่าย ๆ: margin-top: 6px; */
+}
+
+/* Hover focus effect */
+.floor-card:hover{
+  transform: translateY(-4px) scale(1.02);
+  border-color: rgba(255,255,255,.30);
+  box-shadow:
+    0 22px 36px rgba(0,0,0,.45),
+    inset 0 1px 0 rgba(255,255,255,.30),
+    0 0 36px rgba(0,246,255,.28);
+}
+
+/* Animations */
+@keyframes barFlow{
+  0%{background-position:0% 50%}
+  50%{background-position:100% 50%}
+  100%{background-position:0% 50%}
+}
+@keyframes sheen{
+  0%, 100%{transform: translateX(-35%) rotate(0.001deg)}
+  50%{transform: translateX(35%) rotate(0.001deg)}
+}
+
+
+/* ===== Floor Switcher (under clock) ===== */
+.floor-switcher{
+  position: absolute;
+  top: calc(68px + 130px);  /* ✅ อยู่ใต้ .ios-clock (68px) + เว้นอีก 130px */
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 5;
+  width: min(92vw, 980px);
+  display: flex;
+  justify-content: center;
+  pointer-events: none;       /* ให้คลิกได้เฉพาะปุ่มด้านใน */
+}
+
+.chip-group{
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+  justify-content: center;
+  background: rgba(0, 0, 0, 0.45);
+  backdrop-filter: blur(12px) saturate(140%);
+  -webkit-backdrop-filter: blur(12px) saturate(140%);
+  border: 1px solid rgba(0,255,255,0.18);
+  border-radius: 999px;
+  padding: 8px 10px;
+  box-shadow: 0 10px 24px rgba(0,0,0,.35), 0 0 18px rgba(0,255,255,.08) inset;
+  pointer-events: auto;       /* เปิดคลิก */
+}
+
+/* ปุ่มแบบชิป (minimal) */
+.chip{
+  appearance: none;
+  border: 1px solid rgba(0,255,255,0.25);
+  background: rgba(255,255,255,0.06);
+  color: #dff;
+  font: 600 12px/1 'Orbitron', sans-serif;
+  letter-spacing: .4px;
+  padding: 9px 14px;
+  border-radius: 999px;
+  cursor: pointer;
+  transition: transform .18s ease, box-shadow .18s ease, background .18s ease, border-color .18s ease, color .18s ease;
+  text-shadow: 0 0 6px rgba(0,255,255,.25);
+}
+
+.chip:hover{
+  transform: translateY(-1px);
+  box-shadow: 0 6px 16px rgba(0,0,0,.35);
+  border-color: rgba(0,255,255,0.45);
+}
+
+.chip.active{
+  background: rgba(0,255,255,0.18);
+  color: #001316;
+  border-color: rgba(0,255,255,0.85);
+  box-shadow: 0 0 16px rgba(0,255,255,.35);
+}
+
+@media (max-width: 768px){
+  .floor-switcher{ top: 124px; width: 94vw; }
+  .chip{ font-size: 11px; padding: 8px 12px; }
+}
+
+  /* === CCTV MAP WIDGET ===== */
+  #cctvMap{
+    position:relative;
+    width:100%;
+    aspect-ratio: 1302 / 768;           /* ปรับตามอัตราส่วนรูปแปลน */
+    border-radius:12px; overflow:hidden;
+    background:
+      linear-gradient(180deg, rgba(255,255,255,.05), transparent),
+      linear-gradient(0deg, rgba(255,255,255,.06) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(255,255,255,.06) 1px, transparent 1px),
+      #000;
+    background-size:100% 100%, 32px 32px, 32px 32px, cover;
+    box-shadow: 0 0 18px rgba(0,255,255,.25);
+  }
+  #cctvMap .map{
+    position:absolute; inset:0;
+    background:center/cover no-repeat;
+    filter: drop-shadow(0 0 8px rgba(56,189,248,.25)) drop-shadow(0 0 18px rgba(139,92,246,.18));
+    opacity:.95;
+  }
+  #cctvMap .layer{ position:absolute; inset:0; }
+
+  /* จุดกล้อง */
+  #cctvMap .cam{
+    position:absolute; translate:-50% -50%;
+    width:18px; height:18px; border-radius:50%;
+    display:grid; place-items:center; cursor:pointer;
+    filter: drop-shadow(0 0 6px rgba(56,189,248,.8)) drop-shadow(0 0 14px rgba(139,92,246,.6));
+    transition: transform .15s ease, filter .15s ease;
+  }
+  #cctvMap .cam::before{
+    content:""; width:10px; height:10px; border-radius:50%;
+    background:#22D3EE; /* ฟ้านีออน */
+    box-shadow:0 0 8px currentColor, 0 0 16px currentColor;
+  }
+  /* กำลังมองภาพอยู่ */
+  #cctvMap .cam.active{ filter: drop-shadow(0 0 10px rgba(255,73,255,.9)) drop-shadow(0 0 22px rgba(255,73,255,.7)); }
+  #cctvMap .cam.active::before{ background:#FF49FF; }
+  #cctvMap .cam.active::after{
+    content:""; position:absolute; width:10px; height:10px; border-radius:50%;
+    border:2px solid #FF49FF; opacity:.85; animation:cctvPulse 1.6s ease-out infinite;
+  }
+  @keyframes cctvPulse{ from{transform:scale(1);opacity:.9} to{transform:scale(3.2);opacity:0} }
+
+  /* Coverage (ถ้าอยากโชว์) */
+  #cctvMap .coverage{
+    position:absolute; translate:-50% -50%;
+    width:140px; height:140px; border-radius:50%; pointer-events:none;
+    background: radial-gradient(60% 60% at 50% 50%, rgba(255,255,255,.12), transparent 70%),
+                rgba(56,189,248,.18);
+    mix-blend-mode: screen;
+  }
+
+  /* Tooltip */
+  #cctvMap .tip{
+    position:absolute; translate:-50% calc(-100% - 12px);
+    background: rgba(10,14,22,.78); color:#E5F4FF;
+    border:1px solid rgba(148,163,184,.25);
+    padding:6px 8px; border-radius:8px; font-size:12px; white-space:nowrap;
+    opacity:0; transform: translateY(6px); transition:.12s ease; pointer-events:none;
+    backdrop-filter: blur(6px);
+  }
+  #cctvMap .pin:hover .tip{ opacity:1; transform: translateY(0); }
+
+/* === Transparent Map Mode (พื้นใส) ===================== */
+.camera-image { background: transparent !important; }
+
+#cctvMap{
+  background: transparent !important;   /* ตัด gradient + grid เดิมออก */
+  box-shadow: none !important;          /* เอาเงากรอบออก (ถ้าไม่ต้องการ) */
+}
+
+#cctvMap::before,
+#cctvMap::after { content: none !important; }
+
+#cctvMap .map{
+  background-color: transparent !important;
+  /* ใช้ 'contain' ถ้าอยากเห็นภาพทั้งใบแบบไม่ถูกครอป */
+  background-position: center !important;
+  background-repeat: no-repeat !important;
+  background-size: contain !important;  /* หรือใช้ cover ถ้าอยากให้เต็มกรอบ */
+  opacity: 1 !important;                /* เอาความโปร่งออกให้คมชัด */
+  /* เอฟเฟกต์ที่ทำให้ขุ่น/เรืองมากไป สามารถปิดได้ */
+  filter: none !important;
+}
+/* วางใกล้ท้ายไฟล์ CSS หรือหลังสไตล์ทั้งหมด */
+.glass-modal {
+  z-index: 20000 !important;   /* สูงกว่า .cctv-col-* ที่ใช้ 10000 */
+}
+
+/* ถ้าต้องการล็อกพื้นหลังไม่ให้คลิก/สกรอลตอนเปิดโมดัล */
+body.modal-open {
+  overflow: hidden;
+}
+
+/* จัดบรรทัดสถานะ (para21) กับเลขชั้น ให้อยู่บรรทัดเดียวกัน */
+.floor-card .floor-line{
+  display: flex;
+  align-items: baseline;   /* ให้แนวตัวอักษรรับกันกับเลขใหญ่ */
+  justify-content: space-between; /* ซ้าย-ขวาพอดีช่อง */
+  gap: 10px;
+  width: 100%;
+}
+
+/* ป้ายสถานะจาก para21 ที่ชิดซ้าย */
+.para21-badge{
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 10px;
+  border-radius: 999px;
+  font: 700 12px/1 'Orbitron', sans-serif;
+  letter-spacing: .4px;
+  color: #001316;
+  background: rgba(0,255,255,.22);
+  border: 1px solid rgba(0,255,255,.65);
+  text-shadow: 0 0 6px rgba(0,255,255,.25);
+  box-shadow: 0 0 12px rgba(0,246,255,.18) inset, 0 4px 10px rgba(0,0,0,.25);
+  white-space: nowrap;         /* ไม่ตัดบรรทัด */
+  max-width: 52%;              /* กันล้นบรรทัดในช่องเดิม */
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* ถ้าต้องการให้เลขชั้นชิดขวาแบบนิ่ง ก็ปล่อย .number เดิมได้เลย */
+/* (มี transform: translateY(18px); อยู่แล้ว) */
+/* ถ้าตัวเลขซ้อน ให้ลด translateY ลงเล็กน้อยได้ เช่น 12px */
+
+    .para21-badge.is-bps{
+      background: rgba(0,255,255,.24);
+      border-color: rgba(0,255,255,.85);
+    }
+    .para21-badge.is-alert{
+      background: rgba(255,73,255,.22);
+      border-color: rgba(255,73,255,.75);
+      color:#160019;
+    }
+    .para21-badge.is-normal{
+      background: rgba(56,189,248,.18);
+      border-color: rgba(56,189,248,.55);
+    }
+
+/* === Floor line layout: left group (chips+badge) + right number === */
+.floor-card .floor-line{
+  display:flex; align-items:baseline; justify-content:space-between; gap:10px;
+  width:100%;
+}
+.floor-card .floor-line .left-line{
+  display:flex; align-items:center; gap:8px; min-width:0;  /* กันล้น */
+}
+
+/* === Mini layer chips (ซ้ายมือ) === */
+.mini-chips{ display:flex; gap:6px; flex-wrap:wrap; align-items:center; max-width:56%; }
+.mini-chip{
+  appearance:none; border:1px solid rgba(0,255,255,.28);
+  background:rgba(255,255,255,.06); color:#dff;
+  font:700 10px/1 "Orbitron",sans-serif; letter-spacing:.08em;
+  padding:6px 8px; border-radius:999px; cursor:pointer;
+  transition:.18s ease; text-shadow:0 0 6px rgba(0,255,255,.25); user-select:none;
+}
+.mini-chip:hover{ transform:translateY(-1px); box-shadow:0 8px 18px rgba(0,0,0,.35); border-color:rgba(0,255,255,.65); }
+.mini-chip.active{
+  background:rgba(0,255,255,.18); color:#001316; border-color:rgba(0,255,255,.85);
+  box-shadow:0 0 12px rgba(0,246,255,.22);
+}
+.mini-chip.building{ background:rgba(0,255,255,.12); border-color:rgba(0,255,255,.45); }
+
+/* แต้มสีขอบตามชั้น (ปรับได้ตามใจ) */
+.mini-chip[data-key="1st_Floor"]{ border-color:#31f2ff99; }
+.mini-chip[data-key="M_Floor"]  { border-color:#9b4dff99; }
+.mini-chip[data-key="2nd_Floor"]{ border-color:#00d1ff99; }
+.mini-chip[data-key="3rd_Floor"]{ border-color:#38bdf899; }
+.mini-chip[data-key="4th_Floor"]{ border-color:#a78bfa99; }
+.mini-chip[data-key="Roof_Level"]{ border-color:#22d3ee99; } /* ใช้แทน 5F */
+
+/* ===== Floor line layout (ซ้าย: stack + badge, ขวา: number) ===== */
+.floor-card .floor-line{ display:flex; align-items:baseline; justify-content:space-between; gap:12px; width:100%; }
+.floor-card .floor-line .left-line{ display:flex; align-items:center; gap:10px; min-width:0; }
+
+/* ===== Neon Elevator (mini) — all prefixed elev-mini* ===== */
+.elev-mini{
+  --w: 168px;          /* ความกว้าง stack ย่อ */
+  --h: 96px;           /* ความสูงแต่ละชั้น */
+  --radius: 12px;
+  --line: rgba(0,255,255,.35);
+  --line-strong: rgba(0,255,255,.85);
+  --glass: linear-gradient(180deg, rgba(255,255,255,.12), rgba(255,255,255,.06)), rgba(255,255,255,.05);
+  --shadow: 0 18px 28px rgba(0,0,0,.45);
+  position: relative; width: var(--w); height: 110px; /* ความสูงพื้นที่ stack */
+}
+.elev-mini .iso-mini{ position:relative; width:100%; height:100%; display:grid; place-items:center; perspective:900px; }
+.elev-mini .stack-mini{ position:relative; transform: rotateX(58deg) rotateZ(-32deg) translateY(-8px); transform-style:preserve-3d; }
+
+/* ชั้นย่อ */
+.elev-mini .layer-mini{
+  --z:0;
+  position:absolute; left:0; top:0; width:var(--w); height:var(--h);
+  border-radius:var(--radius); background:var(--glass); border:1px solid var(--line);
+  box-shadow: var(--shadow), inset 0 1px 0 rgba(255,255,255,.28);
+  transform: translate3d(calc(var(--z)*5px), calc(var(--z)*-14px), calc(var(--z)*26px));
+  transition: transform .45s cubic-bezier(.2,.8,.2,1), box-shadow .35s, border-color .35s, filter .35s, opacity .35s;
+  display:grid; place-items:center; overflow:hidden; user-select:none;
+}
+.elev-mini .layer-mini::before{
+  content:""; position:absolute; inset:-1px; border-radius:inherit; pointer-events:none;
+  background: linear-gradient(140deg, rgba(0,255,255,.55), rgba(0,255,255,0) 30%, rgba(154,77,255,.45));
+  mix-blend-mode:screen; opacity:.22; transition:opacity .25s ease;
+}
+.elev-mini .layer-mini::after{
+  content:attr(data-label);
+  position:absolute; inset:0; display:grid; place-items:center;
+  font-weight:800; font-size:16px; letter-spacing:.18em; color:#dff; text-shadow: 0 0 8px rgba(0,255,255,.35);
+}
+
+/* แถบด้านบน */
+.elev-mini .bar-mini{
+  position:absolute; left:0; right:0; top:0; height:28px; border-top-left-radius:inherit; border-top-right-radius:inherit;
+  background: linear-gradient(270deg, #00f6ff, #9b4dff, #00f6ff); background-size:260% 100%;
+  animation: elevBarFlow 7s ease-in-out infinite; box-shadow: 0 0 12px rgba(0,246,255,.55), 0 0 16px rgba(155,77,255,.35);
+  opacity:.9; transition: box-shadow .3s ease, filter .3s ease;
+}
+
+/* hover fan-out เล็กน้อย */
+.elev-mini .iso-mini:hover .layer-mini{
+  transform: translate3d(calc(var(--z)*9px), calc(var(--z)*-22px), calc(var(--z)*40px));
+  filter:saturate(130%);
+  box-shadow: 0 28px 40px rgba(0,0,0,.55), 0 0 20px rgba(0,255,255,.22) inset;
+}
+
+/* active = เลือกชั้นเดียว */
+.elev-mini .layer-mini.active{
+  border-color: var(--line-strong);
+  box-shadow: 0 0 22px rgba(0,255,255,.5), inset 0 0 0 1px rgba(0,255,255,.32), var(--shadow);
+}
+
+/* โหมด BPS: เน้นทุกชั้น */
+.elev-mini .stack-mini.all-mode .layer-mini{
+  border-color: var(--line-strong);
+  filter:saturate(145%);
+  animation: elevPulse 1.9s ease-in-out infinite;
+  animation-delay: var(--delay, 0s);
+}
+.elev-mini .stack-mini.all-mode .layer-mini::before{ opacity:.36; }
+
+/* ตอนเลือกชั้นเดียว: ให้แถบอื่นเบา */
+.elev-mini .stack-mini:not(.all-mode) .layer-mini .bar-mini{ opacity:.15; filter:saturate(60%) blur(.4px); animation:none; box-shadow:none; }
+.elev-mini .stack-mini:not(.all-mode) .layer-mini.active .bar-mini{
+  opacity:.95; filter:saturate(160%); animation: elevBarFlow 6s ease-in-out infinite;
+  box-shadow: 0 0 12px rgba(0,246,255,.6), 0 0 18px rgba(155,77,255,.4);
+}
+
+/* Animations */
+@keyframes elevBarFlow{ 0%{background-position:0% 50%} 50%{background-position:100% 50%} 100%{background-position:0% 50%} }
+@keyframes elevPulse{
+  0%,100%{ box-shadow: var(--shadow), inset 0 1px 0 rgba(255,255,255,.28), 0 0 0 rgba(0,255,255,0); }
+  50%{ box-shadow: var(--shadow), inset 0 1px 0 rgba(255,255,255,.38), 0 0 22px rgba(0,255,255,.4), 0 0 30px rgba(155,77,255,.3); }
+}
+
+/* ชิดซ้ายเฉพาะสแตกเลเยอร์ของ mini-elevator */
+.elev-mini .iso-mini{
+  display: grid;           /* คง grid ไว้ก็ได้ */
+  justify-items: start;    /* เดิม center → start */
+  align-items: center;
+  transform: scale(0.85); /* ย่อทั้งก้อน */
+  margin-left: -30px;    /* ขยับไปทางซ้าย */
+  margin-bottom: 0px;           /* เว้นห่างจากขอบล่างนิดหน่อย */
+}
+
+/* กันเผื่อมี margin/translation ทำให้ดูไม่ซ้ายจริง */
+.elev-mini .stack-mini{
+  margin-left: 20px;
+  /* ถ้ารู้สึกว่ามันยังเยื้องขวาเพราะ transform 3D
+     ลดค่า translateY/translateX ได้ เช่น: */
+  /* transform: rotateX(58deg) rotateZ(-32deg) translateY(-8px) translateX(0); */
+}
+
+/* --- ยืดความสูง floor-card ตามคอนเทนต์ --- */
+.floor-card{
+  /* height: 120px;   <- เอาออก หรือทับด้วยบรรทัดล่าง */
+  height: auto;        /* ให้สูงตามเนื้อหาจริง */
+  min-height: 120px;   /* กันไว้ให้อย่างน้อยเท่าเดิม */
+}
+
+/* --- จัด Elevator ให้ชิดซ้ายภายใน floor-card --- */
+.elev-mini{
+  align-self: flex-start;  /* override จาก align-items:flex-end ของ parent */
+  margin-top: 8px;         /* (เลือกได้) เว้นหัวนิดหน่อยให้ดูโปร่ง */
+}
+
+    /* ===== In/Out/Occupancy pill ===== */
+    .glass-card .io-pill{
+      position:absolute; right:6px; bottom:6px;
+      display:flex; gap:6px; align-items:center;
+      background: rgba(0,0,0,.45);
+      border:1px solid rgba(0,255,255,.35);
+      border-radius:999px;
+      padding:6px 8px;
+      backdrop-filter: blur(8px) saturate(140%);
+      box-shadow: 0 0 10px #00ffff44, inset 0 0 8px rgba(255,255,255,.08);
+    }
+    .glass-card .io{
+      display:inline-flex; align-items:center; gap:6px;
+      padding:6px 10px; border-radius:999px;
+      font: 700 12px/1 'Orbitron', sans-serif;
+      letter-spacing:.4px; color:#e6ffff;
+      background: rgba(255,255,255,.06);
+      border:1px solid rgba(255,255,255,.12);
+      text-shadow: 0 0 6px rgba(0,255,255,.25);
+      user-select: none;
+    }
+    .glass-card .io svg{
+      width:16px; height:16px; flex:0 0 16px;
+      filter: drop-shadow(0 0 6px rgba(0,255,255,.35));
+      fill: currentColor;
+    }
+    .glass-card .io.in  { color:#20f7a7; border-color:#20f7a755; }
+    .glass-card .io.out { color:#ff49ff; border-color:#ff49ff66; }
+    .glass-card .io.occ { color:#00eaff; border-color:#00eaff66; }
+
+    @media (max-width: 768px){
+      .glass-card .io-pill{ gap:4px; padding:5px 6px; }
+      .glass-card .io{ padding:5px 8px; font-size:11px; }
+      .glass-card .io svg{ width:14px; height:14px; }
+    }
+    
+/* === Neon Blue Water (inline, scoped) === */
+#waterWidget{
+  --bg1:#060b19; --bg2:#0b1230;
+  --neon:#00eaff; --neon2:#64f3ff; --glow:#bff7ff;
+  position: relative; width:100%; height:80px;
+  border-radius:12px; overflow:hidden;
+  background:
+    radial-gradient(400px 150px at 78% 18%, rgba(0,234,255,.18), transparent 60%),
+    linear-gradient(180deg, var(--bg1) 0%, var(--bg2) 100%);
+  box-shadow: inset 0 0 12px rgba(0,234,255,.15);
+}
+
+/* ชั้นน้ำ (ปรับจาก fixed → absolute ภายในกล่อง) */
+#waterWidget .water{ position:absolute; inset:0; pointer-events:none; }
+#waterWidget .pane{ position:absolute; inset:0; }
+#waterWidget .pane svg{ width:200%; height:100%; display:block; will-change:transform; }
+
+/* seamless drift */
+#waterWidget .d1{ animation: nw-drift1 9s linear infinite; }
+#waterWidget .d2{ animation: nw-drift2 13s linear infinite; }
+#waterWidget .d3{ animation: nw-drift3 20s linear infinite; }
+@keyframes nw-drift1{ from{transform:translateX(0)} to{transform:translateX(-50%)} }
+@keyframes nw-drift2{ from{transform:translateX(0)} to{transform:translateX(-50%)} }
+@keyframes nw-drift3{ from{transform:translateX(0)} to{transform:translateX(-50%)} }
+
+/* เส้นไฮไลต์สันคลื่น + เรืองแสงก้นบ่อ */
+#waterWidget .crest{ position:absolute; left:0; right:0; bottom: calc(70% - 2px);
+  background: linear-gradient(90deg, transparent, rgba(191,247,255,.8), transparent);
+  filter: drop-shadow(0 0 12px rgba(191,247,255,.45)); opacity:.45; }
+#waterWidget .glow{ position:absolute; left:0; right:0; bottom:0; height:60px; z-index:3;
+  background: radial-gradient(100% 120% at 50% 100%, rgba(0,234,255,.22), transparent 70%);
+  mix-blend-mode:screen; }
+
+#waterWidget svg{ shape-rendering:geometricPrecision; text-rendering:geometricPrecision; }
+@media (prefers-reduced-motion: reduce){ #waterWidget .pane svg{ animation-duration:.001s; } }
+
+/* === Water overrides: transparent top & edge-to-edge in .left card === */
+
+/* โปร่งใสทั้งบล็อค และตัดเงากล่องออก */
+#waterWidget{
+  background: transparent !important;
+  box-shadow: none !important;
+  /* เพิ่มระยะห่างใต้ผิวน้ำนิดหน่อยตามชอบ */
+  margin-block: 8px 10px;
+}
+
+/* ทำให้กินเต็มขอบการ์ดในฝั่ง .left (การ์ดมี padding:16px) */
+.left .card #waterWidget{
+  /* ดึงออกชิดขอบซ้าย–ขวา */
+  margin-left: -16px;
+  margin-right: -16px;
+  width: calc(100% + 32px);
+  border-radius: 0;        /* แตะขอบเนียน ๆ */
+  overflow: hidden;        /* กันไม่ให้ล้น */
+}
+
+/* ชั้นน้ำยังคง absolute ภายในบล็อค ไม่หลุดออกนอก .left */
+#waterWidget .water{ position:absolute; inset:0; pointer-events:none; }
+
+/* คลื่นขยายกว้าง 200% และเลื่อน -50% เพื่อให้ต่อเนื่องถึงสุดขอบ */
+#waterWidget .pane svg{ width:200%; height:100%; display:block; will-change:transform; }
+
+/* เงาสันคลื่น/แสงก้นบ่อลดลงเล็กน้อยเพื่อให้ดูโปร่ง */
+#waterWidget .crest{ opacity:.35; }
+#waterWidget .glow{
+  height:20px;
+  background: radial-gradient(110% 130% at 50% 100%, rgba(0,234,255,.18), transparent 70%);
+}
+
+/* FIX: บังคับให้ชนขอบ layout */
+.glass-modal {
+  top: var(--top-h) !important;
+  left: var(--left-w) !important;
+  right: var(--right-w) !important;
+  bottom: var(--safe-bottom) !important;
+  width: auto !important;
+  height: auto !important;
+  transform: none !important;
+}
+
+/* === Neon Blue Water — Compact Version === */
+#waterWidget {
+  position: relative;
+  width: 100%;
+  height: 90px;                 /* ลดสูงสุด ให้ widget แคบลง */
+  border-radius: 12px;
+  overflow: hidden;
+  background:
+    radial-gradient(400px 150px at 78% 18%, rgba(0,234,255,.18), transparent 60%), /* ลด radial gradient */
+    linear-gradient(180deg, var(--bg1) 0%, var(--bg2) 100%);
+  box-shadow: inset 0 0 8px rgba(0,234,255,.12);
+}
+
+/* ชั้นน้ำ absolute ภายใน widget */
+#waterWidget .water { position: absolute; inset:0; pointer-events:none; }
+#waterWidget .pane svg { width:200%; height:100%; display:block; will-change:transform; }
+
+/* ลด glow ด้านบน */
+#waterWidget .glow {
+  height: 25px;  /* แคบลงจาก 72px → 25px */
+  background: radial-gradient(100% 110% at 50% 100%, rgba(0,234,255,.18), transparent 70%);
+  mix-blend-mode: screen;
+}
+
+/* ปรับ crest ให้สูงขึ้น (ลดพื้นที่บน) */
+#waterWidget .crest {
+  bottom: calc(70% - 1px); /* แคบขึ้นจาก 60% → 70% */
+  height: 2px;              /* ลดเส้นสันคลื่นเล็กน้อย */
+  background: linear-gradient(90deg, transparent, rgba(191,247,255,.8), transparent);
+  filter: drop-shadow(0 0 8px rgba(191,247,255,.45));
+  opacity: .35;
+}
+
+/* คลื่นเคลื่อนไหวยังคงเดิม */
+#waterWidget .d1 { animation: nw-drift1 9s linear infinite; }
+#waterWidget .d2 { animation: nw-drift2 13s linear infinite; }
+#waterWidget .d3 { animation: nw-drift3 20s linear infinite; }
+
+    /* ✅ กล่องฝังหน้า IconElect ให้แสดงครบ */
+    .icon-embed {
+      width: 100%;
+      height: 250px;           /* ปรับได้ตามต้องการ */
+      border-radius: 12px;
+      overflow: hidden;
+      margin: 8px 0 14px 0;   /* เว้นก่อนกริดข้อมูล */
+      box-shadow: 0 0 10px rgba(0,255,255,0.25), inset 0 0 6px rgba(255,255,255,0.08);
+      border: 1px solid rgba(255,255,255,0.08);
+    }
+    .icon-embed iframe {
+      width: 100%;
+      height: 100%;
+      border: 0;
+    }
+    
+    /* สไตล์รวมสำหรับมีเดียที่ฝังในกรอบโมดัล */
+    .embed-media {
+      width: 100%;
+      height: 100%;
+      display: block;          /* ตัดช่องว่างใต้รูป */
+      border: none;
+      border-radius: 16px;
+      background: #000;        /* ถ้าภาพไม่เต็มจะเห็นพื้นดำ */
+      object-fit: contain;     /* เห็นภาพทั้งใบในกรอบ; ถ้าอยากเต็มตัดขอบใช้ cover */
+    }
+    
+/* === CCTV Dropdown (top menu) === */
+.menu-buttons .dropdown{ position:relative; z-index:4; }
+.menu-buttons .dd-toggle{
+  background: transparent;
+  border: 1px solid var(--glow);
+  color: var(--text);
+  padding: 10px 18px;
+  border-radius: var(--radius);
+  font-weight: bold; font-size: 14px; cursor: pointer;
+  text-shadow: var(--neon); transition: all .25s ease;
+}
+.menu-buttons .dd-toggle:hover,
+.menu-buttons .dd-toggle.highlight{
+  background: var(--glow); color:#000; box-shadow: 0 0 18px var(--glow);
+}
+.menu-buttons .dd-toggle .caret{
+  display:inline-block; margin-left:8px; transition: transform .2s ease;
+}
+.menu-buttons .dropdown.open .dd-toggle .caret{ transform: rotate(180deg); }
+
+.menu-buttons .dd-menu{
+  position:absolute; top: calc(100% + 8px); left:0; min-width: 220px;
+  background: rgba(0,0,0,.65);
+  backdrop-filter: blur(14px);
+  border: 1px solid var(--glow);
+  border-radius: 12px;
+  box-shadow: 0 0 20px #00ffff66;
+  padding: 6px;
+  display:none;
+}
+.menu-buttons .dropdown.open .dd-menu{ display:block; }
+
+.menu-buttons .dd-menu button{
+  width:100%;
+  background: transparent;
+  border: 1px solid rgba(0,255,255,.25);
+  color: var(--text);
+  padding: 10px 12px; margin: 6px 0;
+  border-radius: 10px; text-align:left;
+  font-weight:600; font-size: 13px; cursor:pointer;
+  transition: all .2s ease;
+}
+.menu-buttons .dd-menu button:hover{
+  background: rgba(0,255,255,.18); color:#001316;
+  border-color: rgba(0,255,255,.85);
+  box-shadow: 0 0 12px rgba(0,246,255,.22);
+}
+
+/* ยกชั้น dropdown และเมนูย่อยให้สูงกว่า ios-clock */
+.menu-buttons .dropdown { position: relative; z-index: 10010; }
+.menu-buttons .dd-menu   { position: absolute; z-index: 10020; }
+
+/* === Bottom full-width image bar === */
+.bottom-image-container{
+  position: fixed;
+  left: 0;
+  right: 0;
+  bottom: -20px; /* ขยับลงต่ำกว่าเดิม 20px */                 /* ชิดล่างจอ */
+  width: 100vw;
+  background: rgba(0,0,0,0.65);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  z-index: 25000;            /* สูงกว่า glass-modal (20000) */
+  padding: 6px 0 0 0;        /* เว้นนิดให้ดูลอย */
+  display: none;             /* เริ่มซ่อน */
+}
+
+.bottom-image-container.active{ display:block; }
+
+.bottom-image-container img{
+  display:block;
+  width:100%;
+  height:auto;
+  max-height:42vh;           /* กันสูงเกินครึ่งจอ */
+  object-fit:cover;          /* ให้เต็มแถบล่าง */
+  border-radius: 8px 8px 0 0;
+  border: 1px solid #00eaff55;
+  box-shadow: 0 0 12px #00eaff66;
+}
+
+.bottom-image-container .close-btn{
+  position:absolute;
+  top:6px;
+  right:8px;
+  z-index:2;
+}
+
+#bottomCam{
+  position: fixed;
+  /* เว้นด้านซ้าย/ขวาตามความกว้างของบล็อก */
+  left: var(--left-w);
+  right: var(--right-w);
+  bottom: 0;
+
+  height: var(--bottom-cam-h);
+  margin: 0 auto;                                /* จัดกึ่งกลาง */
+  max-width: calc(100vw - var(--left-w) - var(--right-w));
+  background: rgba(0,0,0,.35);
+  backdrop-filter: blur(6px);
+  border-top: 1px solid rgba(0,255,255,.25);
+  border-radius: 12px 12px 0 0;                  /* โค้งขอบด้านบนเล็กน้อย */
+  z-index: 9000;                                 /* ต่ำกว่าคอลัมน์กล้อง (10000) */
+  overflow: hidden;
+}
+
+#bottomCam img{
+  width: 100%;
+  height: 100%;
+  display: block;
+  object-fit: cover;     /* ถ้าอยากเห็นภาพทั้งใบ ใช้ 'contain' ได้ */
+  object-position: center;
+}
+
+/* จอแคบมาก ๆ ให้กินเต็มเพื่อความยืดหยุ่น */
+@media (max-width: 900px){
+  #bottomCam{ left: 0; right: 0; max-width: 100vw; }
+}
+
+#bottomCam{ display:none; }
+#bottomCam.active{ display:block; }
+
+/* ตำแหน่งปุ่มปิดสำหรับจอล่าง */
+#bottomCam .close-btn{
+  position:absolute; right:10px; top:10px;
+  z-index:2; background:#0ff; color:#000;
+  border:none; border-radius:8px; padding:6px 10px;
+  font-weight:700; cursor:pointer;
+}
+
+#CCTV1, #CCTV2, #CCTV3, #CCTV4, #CCTV5, #CCTV6, #CCTV7, #CCTV8, #CCTV9 {
+  width: 500px !important;
+  aspect-ratio: 16 / 9;
+}
+
+/* bottomCam ถูกซ่อน ไม่ว่าคลาส .active จะอยู่หรือไม่ */
+#bottomCam {
+  display: none !important;
+  visibility: hidden !important;
+  opacity: 0 !important;
+  pointer-events: none !important;
+}    
+    
+  </style>
+  <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700&display=swap" rel="stylesheet">
+</head>
+<body>
+  <div class="layout">
+    <div class="background">
+      <iframe id="skfb-frame" allow="autoplay; fullscreen; xr-spatial-tracking" allowfullscreen></iframe>
+    </div>
+
+
+    <!-- กล้องแนวตั้งฝั่งซ้าย -->
+    <div class="cctv-col-left">
+      <h3 id="cameraNameBox1"></h3>
+      <div id="CCTV1" class="glass-card"><h32 id="name1">-</h32><img id="modalImg1"><h3 id="datetime1">-</h3></div>
+      <div id="CCTV2" class="glass-card"><h32 id="name2">-</h32><img id="modalImg2"><h3 id="datetime2">-</h3></div>
+      <div id="CCTV3" class="glass-card"><h32 id="name3">-</h32><img id="modalImg3"><h3 id="datetime3">-</h3></div>
+      <div id="CCTV4" class="glass-card"><h32 id="name4">-</h32><img id="modalImg4"><h3 id="datetime4">-</h3></div>
+    </div>
+    
+    <!-- กล้องแนวตั้งกลาง -->
+    <div class="cctv-col-center">
+      <div id="CCTV9" class="glass-card"><h32 id="name9">-</h32><img id="modalImg9"><h3 id="datetime9">-</h3>
+      
+      <!-- ▶ ป้ายเข้า-ออก-คงอยู่ -->
+      <div class="io-pill">
+        <div class="io in" title="จำนวนคนเข้า">
+          <!-- enter -->
+          <svg viewBox="0 0 24 24" aria-hidden="true">
+            <path d="M12 2a3 3 0 110 6 3 3 0 010-6zm-6.5 17c0-2.5 5-3.9 6.5-3.9S18.5 16.5 18.5 19v1H5.5v-1zM20 7h-5l1.8-1.8-1.4-1.4L12 7l3.4 3.2 1.4-1.4L15 7h5V5z"/>
+          </svg>
+          <span id="in9">0</span>
+        </div>
+        <div class="io out" title="จำนวนคนออก">
+          <!-- exit -->
+          <svg viewBox="0 0 24 24" aria-hidden="true">
+            <path d="M12 2a3 3 0 110 6 3 3 0 010-6zm-6.5 17c0-2.5 5-3.9 6.5-3.9S18.5 16.5 18.5 19v1H5.5v-1zM20 9h-5l1.8 1.8-1.4 1.4L12 9l3.4-3.2 1.4 1.4L15 9h5v2z"/>
+          </svg>
+          <span id="out9">0</span>
+        </div>
+        <div class="io occ" title="จำนวนคงอยู่ภายในโซน">
+          <!-- occupancy -->
+          <svg viewBox="0 0 24 24" aria-hidden="true">
+            <path d="M7 8a3 3 0 110-6 3 3 0 010 6zM1 20c0-2.5 4-4 6-4s6 1.5 6 4v1H1v-1zm13-9a3 3 0 110-6 3 3 0 010 6zm-2 9c0-1.2.4-2.3 1.1-3.2.7-.8 1.6-1.3 2.9-1.8 1.3.5 2.2 1 2.9 1.8.7.9 1.1 2 1.1 3.2v1H12v-1z"/>
+          </svg>
+          <span id="occ9">0</span>
+        </div>
+      </div>
+      
+      </div>
+    </div>
+    
+    <!-- กล้องแนวตั้งฝั่งขวา -->
+    <div class="cctv-col-right">
+      <h3 id="cameraNameBox2"></h3>
+      <div id="CCTV5" class="glass-card"><h32 id="name5">-</h32><img id="modalImg5"><h3 id="datetime5">-</h3></div>
+      <div id="CCTV6" class="glass-card"><h32 id="name6">-</h32><img id="modalImg6"><h3 id="datetime6">-</h3></div>
+      <div id="CCTV7" class="glass-card"><h32 id="name7">-</h32><img id="modalImg7"><h3 id="datetime7">-</h3></div>
+      <div id="CCTV8" class="glass-card"><h32 id="name8">-</h32><img id="modalImg8"><h3 id="datetime8">-</h3></div>
+    </div>
+
+    <div class="top">
+      <div class="top-left">
+        <div class="dashboard-title" id="animatedTitle"></div>
+      </div>
+      <div class="top-right">
+        <a href="https://postimg.cc/21pssXr5" target="_blank">
+          <img src="https://i.postimg.cc/Z50Jy1Q6/BPS-LOGO-1.gif" alt="BPS Logo" style="width: 85px; height: auto;">
+        </a>
+      </div>
+      <div class="top-center">
+        <div class="menu-buttons">
+          <button onclick="runDemo()">▶ Auto View</button>
+          
+            <div class="dropdown" id="cctvDropdown">
+              <button class="dd-toggle" onclick="toggleCctvDD(event)">
+                CCTV <span class="caret">▾</span>
+              </button>
+              <div class="dd-menu" role="menu" aria-label="CCTV submenu">
+                <button role="menuitem" onclick="openCctvItem('CCTVSecurity')">MainCCTV</button>
+                <button role="menuitem" onclick="openCctvItem('CCTV-HQ')">HQ</button>
+                <button role="menuitem" onclick="openCctvItem('CCTV-WH')">WH</button>
+                <button role="menuitem" onclick="openCctvItem('CCTV-UDS')">UDS</button>
+                <button role="menuitem" onclick="openCctvItem('Hik-Connect')">Hik-Connect</button>
+              </div>
+            </div>
+
+<!-- Electrical -->
+<div class="dropdown" id="electricalDD">
+  <button class="dd-toggle" onclick="toggleDD(event, 'electricalDD')">
+    Electrical <span class="caret">▾</span>
+  </button>
+  <div class="dd-menu" role="menu" aria-label="Electrical submenu">
+    <button role="menuitem" onclick="openDDItem('ElectricalSystem','electricalDD')">Electrical System</button>
+    <button role="menuitem" onclick="openDDItem('SmartIOTMeter','electricalDD')">Smart IOT Meter Monitoring</button>
+    <button role="menuitem" onclick="openDDItem('Waston','electricalDD')">Waston</button>
+  </div>
+</div>
+
+<!-- Water -->
+<div class="dropdown" id="waterDD">
+  <button class="dd-toggle" onclick="toggleDD(event, 'waterDD')">
+    Water <span class="caret">▾</span>
+  </button>
+  <div class="dd-menu" role="menu" aria-label="Water submenu">
+    <button role="menuitem" onclick="openDDItem('WaterSystem','waterDD')">Water System</button>
+    <button role="menuitem" onclick="openDDItem('wastewater','waterDD')">Wastewater</button>
+  </div>
+</div>
+
+<!-- FreshAir -->
+<div class="dropdown" id="freshAirDD">
+  <button class="dd-toggle" onclick="toggleDD(event, 'freshAirDD')">
+    FreshAir <span class="caret">▾</span>
+  </button>
+  <div class="dd-menu" role="menu" aria-label="FreshAir submenu">
+    <button role="menuitem" onclick="openDDItem('FreshAir','freshAirDD')">Fresh Air</button>
+    <button role="menuitem" onclick="openDDItem('CoolingTower','freshAirDD')">Cooling Tower</button>
+    <button role="menuitem" onclick="openDDItem('CleanAirSystem','freshAirDD')">Clean Air System</button>
+  </div>
+</div>
+
+<!-- Logistics -->
+<div class="dropdown" id="logisticsDD">
+  <button class="dd-toggle" onclick="toggleDD(event, 'logisticsDD')">
+    Logistics <span class="caret">▾</span>
+  </button>
+  <div class="dd-menu" role="menu" aria-label="Logistics submenu">
+    <button role="menuitem" onclick="openDDItem('logisticsCenterModal','logisticsDD')">Logistics Center</button>
+    <button role="menuitem" onclick="openDDItem('LogisticsCRM','logisticsDD')">Logistics CRM</button>
+  </div>
+</div>
+
+<!-- SolarCell -->
+<div class="dropdown" id="solarDD">
+  <button class="dd-toggle" onclick="toggleDD(event, 'solarDD')">
+    SolarCell <span class="caret">▾</span>
+  </button>
+  <div class="dd-menu" role="menu" aria-label="SolarCell submenu">
+    <button role="menuitem" onclick="openDDItem('SolarCell','solarDD')">BPS-SolarCell</button>
+    <button role="menuitem" onclick="openDDItem('fusionsolar','solarDD')">fusionsolar</button>
+  </div>
+</div>
+
+<!-- FiberOptic -->
+<div class="dropdown" id="fiberDD">
+  <button class="dd-toggle" onclick="toggleDD(event, 'fiberDD')">
+    FiberOptic <span class="caret">▾</span>
+  </button>
+  <div class="dd-menu" role="menu" aria-label="FiberOptic submenu">
+    <button role="menuitem" onclick="openDDItem('FiberOptic2','fiberDD')">Fiber Optic</button>
+    <button role="menuitem" onclick="openDDItem('FiberOptic','fiberDD')">Fiber Optic-Check Material</button>
+  </div>
+</div>
+
+<!-- Other -->
+<div class="dropdown" id="otherDD">
+  <button class="dd-toggle" onclick="toggleDD(event, 'otherDD')">
+    Other <span class="caret">▾</span>
+  </button>
+  <div class="dd-menu" role="menu" aria-label="Other submenu">
+    <button role="menuitem" onclick="openDDItem('Wellness','otherDD')">Wellness</button>
+    <button role="menuitem" onclick="openDDItem('DataCenter','otherDD')">DataCenter</button>
+    <button role="menuitem" onclick="openDDItem('CapsuleHouse','otherDD')">Capsule House</button>
+  </div>
+</div>
+          
+      
+      </div>
+
+      <!-- ใต้ .top-center -->
+      <div class="ios-clock">
+        <div class="date" id="date">--</div>
+        <div class="clock"><span id="clock">--:--</span></div>
+      </div>
+      
+      <!-- ✅ Floor switcher under clock -->
+        <div class="floor-switcher">
+          <div id="floorButtons" class="chip-group"></div>
+        </div>
+
+
+      </div>
+    </div>
+
+    <div id="miniPanel" style="
+      display: none;
+      position: absolute;
+      top: 120px; /* ใต้เวลา */
+      left: 320px; /* ชิดหลัง block ซ้าย (ความกว้าง 320px) */
+      right: 320px; /* ไม่ชน block ขวา */
+      background-color: rgba(0, 0, 0, 0.7);
+      border: 1px solid #0ff;
+      border-radius: 14px;
+      box-shadow: 0 0 20px #0ff;
+      padding: 24px;
+      z-index: 20;
+      backdrop-filter: blur(14px);
+      color: white;
+      font-family: sans-serif;
+    ">
+
+      <div style="display: flex; justify-content: space-between; align-items: center;">
+        <h3 style="margin: 0; color: #0ff;">Logistics</h3>
+        <button onclick="toggleMiniPanel()" style="
+          background: #0ff;
+          color: #000;
+          border: none;
+          padding: 6px 12px;
+          border-radius: 8px;
+          cursor: pointer;
+          font-weight: bold;
+        ">Close</button>
+      </div>
+      <iframe src="https://lookerstudio.google.com/embed/reporting/2a55735c-1218-4170-8696-db6f06ad0725/page/p_pmwprespbd"
+        style="width:100%; height:700px; border:none; margin-top:14px; border-radius:10px;"></iframe>
+    </div>
+
+
+    <div class="left">
+      <div class="card">
+        <h3></h3>
+        
+        <div class="floor-card">
+
+            <span class="label" id="BuildorFloor"></span>
+            <!-- เลขชั้นใหญ่เดิม -->
+            <span class="number" id="NumberFloor">-</span><br></br><br></br>
+
+              <!-- 🔹 Neon Elevator (mini) -->
+              <div id="ElevMini" class="elev-mini" aria-label="Floor stack">
+                <div class="iso-mini" id="isoMini">
+                  <div class="stack-mini" id="stackMini"></div>
+                </div>
+              </div>
+
+        </div>
+        
+
+
+                
+        <div class="camera-image">
+          <!-- แผนที่กล้องแบบล้ำสมัยจะแสดงตรงนี้ -->
+          <div id="cctvMap"></div>
+        </div><br></br>
+
+        
+        <button onclick="openLogistics('BUILDING_OVERVIEW')">Building Overview</button>
+        <button onclick="openLogistics('OFFICE_MAP')">Office Map</button><br></br>
+
+      </div>
+      
+      <div class="scrolling-wrapper">
+      <div class="scrolling-content-left">
+          
+      <div class="card">
+        <h3> 
+          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#0ff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M12 2C12 2 5 9 5 14a7 7 0 0014 0c0-5-7-12-7-12z"/>
+          </svg>
+          Water System
+        </h3>
+          <div class="electrical-grid">
+            <div class="metric">
+              <strong style="color: #0ff;">Flow Rate</strong>
+              <div id="infoBox10">-</div>
+            </div>
+            <div class="metric">
+              <strong style="color: #0ff;">Duration (Days)</strong>
+              <div id="infoBox11">-</div>
+            </div>
+            <div class="metric">
+              <strong style="color: #0ff;">Duration (Months)</strong>
+              <div id="infoBox12">-</div>
+            </div>
+            <div class="metric">
+              <strong style="color: #0ff;">Water Usage</strong>
+              <div id="infoBox13">-</div>
+            </div>
+          </div>
+<!-- Neon Blue Water — Inline Widget -->
+<div id="waterWidget" aria-label="Neon water visual">
+  <div class="water">
+    <!-- LAYER 1 (front) -->
+    <div class="pane">
+      <svg class="d1" viewBox="0 0 1600 400" preserveAspectRatio="none">
+        <defs>
+          <linearGradient id="nw-body1" x1="0" y1="0" x2="1" y2="0">
+            <stop offset="0%" stop-color="var(--neon)" stop-opacity=".36"/>
+            <stop offset="100%" stop-color="var(--neon2)" stop-opacity=".36"/>
+          </linearGradient>
+          <linearGradient id="nw-rim1" x1="0" y1="0" x2="1" y2="0">
+            <stop offset="0%" stop-color="var(--glow)"/>
+            <stop offset="100%" stop-color="var(--neon2)"/>
+          </linearGradient>
+          <filter id="nw-softGlow1" x="-30%" y="-30%" width="160%" height="160%" color-interpolation-filters="sRGB">
+            <feGaussianBlur stdDeviation="6" result="b"/>
+            <feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge>
+          </filter>
+        </defs>
+        <g filter="url(#nw-softGlow1)" style="mix-blend-mode:screen">
+          <g id="nw-tile1">
+            <path id="nw-p1" fill="url(#nw-body1)">
+              <animate attributeName="d" dur="7.5s" repeatCount="indefinite" values="
+                M0,240 C320,180 640,300 960,240 C1280,190 1440,260 1600,240 V400 H0 Z;
+                M0,232 C320,210 640,270 960,232 C1280,210 1440,280 1600,232 V400 H0 Z;
+                M0,246 C320,192 640,312 960,246 C1280,200 1440,252 1600,246 V400 H0 Z;
+                M0,240 C320,180 640,300 960,240 C1280,190 1440,260 1600,240 V400 H0 Z
+              "/>
+              <animateTransform attributeName="transform" type="translate" dur="5.2s"
+                values="0 0; 0 -10; 0 0; 0 10; 0 0" repeatCount="indefinite"/>
+            </path>
+            <use href="#nw-p1" fill="none" stroke="url(#nw-rim1)" stroke-width="2.5" opacity=".9"/>
+          </g>
+          <use href="#nw-tile1"/><use href="#nw-tile1" transform="translate(1600,0)"/>
+        </g>
+      </svg>
+    </div>
+
+    <!-- LAYER 2 (mid) -->
+    <div class="pane">
+      <svg class="d2" viewBox="0 0 1600 400" preserveAspectRatio="none">
+        <defs>
+          <linearGradient id="nw-body2" x1="0" y1="0" x2="1" y2="0">
+            <stop offset="0%" stop-color="var(--neon2)" stop-opacity=".28"/>
+            <stop offset="100%" stop-color="var(--neon)" stop-opacity=".28"/>
+          </linearGradient>
+          <linearGradient id="nw-rim2" x1="0" y1="0" x2="1" y2="0">
+            <stop offset="0%" stop-color="var(--neon2)"/>
+            <stop offset="100%" stop-color="var(--glow)"/>
+          </linearGradient>
+          <filter id="nw-softGlow2" x="-25%" y="-25%" width="150%" height="150%" color-interpolation-filters="sRGB">
+            <feGaussianBlur stdDeviation="5"/>
+          </filter>
+        </defs>
+        <g filter="url(#nw-softGlow2)" style="mix-blend-mode:screen" opacity=".95">
+          <g id="nw-tile2">
+            <path id="nw-p2" fill="url(#nw-body2)">
+              <animate attributeName="d" dur="10s" repeatCount="indefinite" values="
+                M0,282 C360,240 720,320 1080,282 C1320,260 1480,300 1600,282 V400 H0 Z;
+                M0,288 C360,262 720,302 1080,288 C1320,300 1480,270 1600,288 V400 H0 Z;
+                M0,274 C360,232 720,330 1080,274 C1320,248 1480,308 1600,274 V400 H0 Z;
+                M0,282 C360,240 720,320 1080,282 C1320,260 1480,300 1600,282 V400 H0 Z
+              "/>
+              <animateTransform attributeName="transform" type="translate" dur="7s"
+                values="0 0; 0 -7; 0 0; 0 7; 0 0" repeatCount="indefinite"/>
+            </path>
+            <use href="#nw-p2" fill="none" stroke="url(#nw-rim2)" stroke-width="2" opacity=".8"/>
+          </g>
+          <use href="#nw-tile2"/><use href="#nw-tile2" transform="translate(1600,0)"/>
+        </g>
+      </svg>
+    </div>
+
+    <!-- LAYER 3 (back) -->
+    <div class="pane">
+      <svg class="d3" viewBox="0 0 1600 400" preserveAspectRatio="none">
+        <defs>
+          <linearGradient id="nw-body3" x1="0" y1="0" x2="1" y2="0">
+            <stop offset="0%" stop-color="var(--neon)" stop-opacity=".18"/>
+            <stop offset="100%" stop-color="var(--neon2)" stop-opacity=".18"/>
+          </linearGradient>
+          <linearGradient id="nw-rim3" x1="0" y1="0" x2="1" y2="0">
+            <stop offset="0%" stop-color="#ffffff"/>
+            <stop offset="100%" stop-color="var(--neon2)"/>
+          </linearGradient>
+          <filter id="nw-softGlow3" x="-20%" y="-20%" width="140%" height="140%" color-interpolation-filters="sRGB">
+            <feGaussianBlur stdDeviation="4"/>
+          </filter>
+        </defs>
+        <g filter="url(#nw-softGlow3)" style="mix-blend-mode:screen" opacity=".8">
+          <g id="nw-tile3">
+            <path id="nw-p3" fill="url(#nw-body3)">
+              <animate attributeName="d" dur="14s" repeatCount="indefinite" values="
+                M0,320 C380,300 760,340 1140,320 C1320,315 1460,330 1600,320 V400 H0 Z;
+                M0,326 C380,330 760,310 1140,326 C1320,330 1460,310 1600,326 V400 H0 Z;
+                M0,314 C380,292 760,346 1140,314 C1320,308 1460,336 1600,314 V400 H0 Z;
+                M0,320 C380,300 760,340 1140,320 C1320,315 1460,330 1600,320 V400 H0 Z
+              "/>
+              <animateTransform attributeName="transform" type="translate" dur="9s"
+                values="0 0; 0 -5; 0 0; 0 5; 0 0" repeatCount="indefinite"/>
+            </path>
+            <use href="#nw-p3" fill="none" stroke="url(#nw-rim3)" stroke-width="1.5" opacity=".7"/>
+          </g>
+          <use href="#nw-tile3"/><use href="#nw-tile3" transform="translate(1600,0)"/>
+        </g>
+      </svg>
+    </div>
+
+    <div class="crest"></div>
+    <div class="glow"></div>
+  </div>
+</div>
+<!-- /Neon Blue Water -->
+
+          
+      <div class="card">
+        <h3>
+          <svg width="20" height="20" fill="#0ff" viewBox="0 0 24 24">
+            <path d="M2 4h20v2H2V4zm2 4h16v3l3 3v2H1v-2l3-3V8zm2 2v2h12v-2H6zm1 6h10v2H7v-2z"/>
+          </svg> CCTV Security
+        </h3>
+          <div class="electrical-grid">
+            <div class="metric">
+              <strong style="color: #0ff;">Offline</strong>
+              <div id="infoBox2">-</div>
+            </div>
+            <div class="metric">
+              <strong style="color: #0ff;">Intruder</strong>
+              <div id="infoBox3">-</div>
+            </div>
+            <div class="metric">
+              <strong style="color: #0ff;">Online</strong>
+              <div id="infoBox4">-</div>
+            </div>
+            <div class="metric">
+              <strong style="color: #0ff;">Total</strong>
+              <div id="infoBox5">-</div>
+            </div>
+          </div><br></br>
+          <div id="groupedBar"></div>
+      </div>
+      
+      
+      <div class="card">
+        <h3>
+          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#0ff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <polygon points="13 2 3 14 12 14 11 22 21 10 13 10 13 2" />
+          </svg>
+           Electrical System
+        </h3>
+        
+      <!-- ✅ ฝังหน้าเดโมจากลิงก์ให้แสดงครบ -->
+      <div class="icon-embed">
+        <iframe
+          src="https://supakit148.github.io/IconElect/"
+          loading="lazy"
+          referrerpolicy="no-referrer-when-downgrade"
+          allow="fullscreen; clipboard-read; clipboard-write">
+        </iframe>
+      </div>
+        
+          <div class="electrical-grid">
+            <div class="metric">
+              <strong style="color: #0ff;">Voltage</strong>
+              <div id="infoBox6">-</div>
+            </div>
+            <div class="metric">
+              <strong style="color: #0ff;">Current</strong>
+              <div id="infoBox7">-</div>
+            </div>
+            <div class="metric">
+              <strong style="color: #0ff;">Frequency</strong>
+              <div id="infoBox8">-</div>
+            </div>
+            <div class="metric">
+              <strong style="color: #0ff;">Power</strong>
+              <div id="infoBox9">-</div>
+            </div>
+          </div><br></br>
+          <h3>Electrical Floor Distribution</h3>
+          <div id="floorDonut" style="width:100%; height:300px;"></div>
+      </div>
+          
+          <br></br>
+              <div id="area" style="width:100%; height:300px;"></div>
+      </div>
+      </div>
+      </div>
+    </div>
+
+    <div class="right">
+    <div class="scrolling-wrapper">
+      <div class="scrolling-content">
+        <div class="card">
+          <h3>
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#0ff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M2 12h20M2 6h16M2 18h12"/>
+            </svg>
+            3D Digital Twin Dashboard
+          </h3>
+          
+          <button onclick="openLogistics('3D_Digital')">3D Digital Twin</button>
+          
+          <!-- Controls สำหรับเลือก Floor, System, Parameter -->
+          <div class="controls" style="margin-bottom:12px;">
+            <select id="floorSelect3D">
+              <option value="ALL">All Floors</option>
+              <option value="1st_Floor">1st Floor</option>
+              <option value="M_Floor">M Floor</option>
+              <option value="2nd_Floor">2nd Floor</option>
+              <option value="3rd_Floor">3rd Floor</option>
+              <option value="4th_Floor">4th Floor</option>
+              <option value="5th_Floor">5th Floor</option>
+            </select>
+        
+            <select id="systemSelect3D">
+              <option value="ALL">All Systems</option>
+              <option value="CCTV">CCTV</option>
+              <option value="Electrical">Electrical</option>
+              <option value="Water">Water</option>
+              <option value="Air">Air</option>
+            </select>
+        
+            <select id="paramSelect3D">
+              <option value="ALL">All Parameters</option>
+            </select>
+        
+            <button id="legendToggle3D">Show Legend</button>
+          </div>
+        
+          <!-- แสดงผล Plotly 3D -->
+          <div id="dashboard3D" style="width:100%; height:200px;"></div>
+
+          <h3>
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#0ff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M2 12h20M2 6h16M2 18h12"/>
+            </svg>
+            Holographic 4D Dashboard
+          </h3>
+          <button onclick="openLogistics('4D_Digital')">4D Digital Twin</button>
+        
+          <!-- Controls -->
+          <div class="controls" style="margin-bottom:12px;">
+            Floor:
+            <select id="floorSelect4D">
+              <option value="ALL">All Floors</option>
+              <option value="1st_Floor">1st Floor</option>
+              <option value="M_Floor">M Floor</option>
+              <option value="2nd_Floor">2nd Floor</option>
+              <option value="3rd_Floor">3rd Floor</option>
+              <option value="4th_Floor">4th Floor</option>
+              <option value="5th_Floor">5th Floor</option>
+            </select>
+        
+            Parameter:
+            <select id="paramSelect4D">
+              <option value="CO2">CO2</option>
+              <option value="Temperature">Temperature</option>
+              <option value="Humidity">Humidity</option>
+              <option value="PM2.5">PM2.5</option>
+            </select>
+          </div>
+        
+          <!-- Plotly 3D Container -->
+          <div id="dashboard4D" style="width:100%; height:400px; border-radius:12px;"></div>
+          
+        </div>
+
+
+      <div class="card">
+        <h3>
+          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#0ff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M2 12h20M2 6h16M2 18h12"/>
+          </svg>
+          Fresh Air
+        </h3>
+        
+          <div class="electrical-grid">
+            <div class="metric">
+              <strong style="color: #0ff;">Temp</strong>
+              <div id="infoBox14">-</div>
+            </div>
+            <div class="metric">
+              <strong style="color: #0ff;">Humidity</strong>
+              <div id="infoBox15">-</div>
+            </div>
+            <div class="metric">
+              <strong style="color: #0ff;">PM2d5</strong>
+              <div id="infoBox16">-</div>
+            </div>
+            <div class="metric">
+              <strong style="color: #0ff;">PM10</strong>
+              <div id="infoBox17">-</div>
+            </div>
+          </div>
+          <div class="electrical-grid">
+            <div class="metric">
+              <strong style="color: #0ff;">TVOC</strong>
+              <div id="infoBox18">-</div>
+            </div>
+            <div class="metric">
+              <strong style="color: #0ff;">CH2O</strong>
+              <div id="infoBox19">-</div>
+            </div>
+            <div class="metric">
+              <strong style="color: #0ff;">CO2</strong>
+              <div id="infoBox20">-</div>
+            </div>
+            <div class="metric">
+              <strong style="color: #0ff;">N2</strong>
+              <div id="infoBox21">-</div>
+            </div>
+          </div><br></br>
+            <div id="radar" style="width:100%; height:300px;"></div>
+        
+      </div>
+      <div class="card">
+        <h3>
+          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#0ff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <circle cx="12" cy="12" r="5"/>
+            <line x1="12" y1="1" x2="12" y2="3"/>
+            <line x1="12" y1="21" x2="12" y2="23"/>
+            <line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/>
+            <line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/>
+            <line x1="1" y1="12" x2="3" y2="12"/>
+            <line x1="21" y1="12" x2="23" y2="12"/>
+          </svg> Solar Cell
+        </h3>
+          <div class="electrical-grid">
+            <div class="metric">
+              <strong style="color: #0ff;">Online</strong>
+              <div>77<br>Sites</div>
+            </div>
+            <div class="metric">
+              <strong style="color: #0ff;">Offline</strong>
+              <div>21<br>Sites</div>
+            </div>
+            <div class="metric">
+              <strong style="color: #0ff;">Fault</strong>
+              <div>7<br>Sites</div>
+            </div>
+            <div class="metric">
+              <strong style="color: #0ff;">Total</strong>
+              <div>105<br>Sites</div>
+            </div>
+          </div><br></br>
+          
+          <h3>Solar Halo (Power vs Time)</h3>
+          <div id="solarHalo" style="width:100%; height:320px;"></div>
+
+          <h3>Daily Energy – Calendar Heatmap</h3>
+          <div id="solarCal" style="width:100%; height:320px;"></div>
+
+      </div>
+      <div class="card">
+        <h3>
+          <svg width="24" height="24" viewBox="0 0 640 512" fill="none" stroke="#0ff" stroke-width="24" stroke-linecap="round" stroke-linejoin="round" xmlns="http://www.w3.org/2000/svg">
+            <path d="M624 352h-16V256c0-26.5-21.5-48-48-48h-64l-64-96H272c-26.5 0-48 21.5-48 48v192H80c-26.5 0-48 21.5-48 48s21.5 48 48 48h32c0 35.3 28.7 64 64 64s64-28.7 64-64h160c0 35.3 28.7 64 64 64s64-28.7 64-64h16c26.5 0 48-21.5 48-48s-21.5-48-48-48zM400 128h49.6l38.4 64H400V128zM176 448c-17.7 0-32-14.3-32-32s14.3-32 32-32 32 14.3 32 32-14.3 32-32 32zm288 0c-17.7 0-32-14.3-32-32s14.3-32 32-32 32 14.3 32 32-14.3 32-32 32zm96-96H80v-16h480v16z"/>
+          </svg> Logistics
+        </h3>
+          <div class="electrical-grid">
+            <div class="metric">
+              <strong style="color: #0ff;">Value</strong>
+              <div>2.0<br>Million</div>
+            </div>
+            <div class="metric">
+              <strong style="color: #0ff;">Waiting</strong>
+              <div>40<br>Orders</div>
+            </div>
+            <div class="metric">
+              <strong style="color: #0ff;">Sent</strong>
+              <div>60<br>Orders</div>
+            </div>
+            <div class="metric">
+              <strong style="color: #0ff;">Total</strong>
+              <div>100<br>Orders</div>
+            </div>
+          </div><br></br>
+          <div id="stackedBar"></div>
+      </div>
+      
+      <br>
+        </div>
+    </div>
+    </div>
+  </div>
+  
+  
+    <div id="CCTV" class="glass-modal-cctv">
+      <img id="modalImg"
+           src=""
+           alt="ภาพจากกล้อง" />
+      <h3 id="infoBox1">-</h3>
+      <h3>Entry - 90P | Exit - 90P</h3>
+      <button class="close-btn" onclick="closeLogistics('CCTV')">❌</button>
+    </div>
+  
+  
+  <div id="BUILDING_OVERVIEW" class="glass-modal">
+    <iframe src="https://supakit148.github.io/BUILDING-OVERVIEW/"
+            style="width:100%; height:100%; border:none; border-radius: 16px;"></iframe>
+    <button class="close-btn" onclick="closeLogistics('BUILDING_OVERVIEW')">❌</button>
+  </div>
+  
+  <div id="OFFICE_MAP" class="glass-modal">
+    <iframe src="https://supakit148.github.io/BPSmap/"
+            style="width:100%; height:100%; border:none; border-radius: 16px;"></iframe>
+    <button class="close-btn" onclick="closeLogistics('OFFICE_MAP')">❌</button>
+  </div>
+  
+  <div id="3D_Digital" class="glass-modal">
+    <iframe src="https://supakit148.github.io/3D-Graph-Digital-Twin/"
+            style="width:100%; height:100%; border:none; border-radius: 16px;"></iframe>
+    <button class="close-btn" onclick="closeLogistics('3D_Digital')">❌</button>
+  </div>
+  
+  <div id="4D_Digital" class="glass-modal">
+    <iframe src="https://supakit148.github.io/4D-Graph-Digital-Twin/"
+            style="width:100%; height:100%; border:none; border-radius: 16px;"></iframe>
+    <button class="close-btn" onclick="closeLogistics('4D_Digital')">❌</button>
+  </div>
+
+  <div id="logisticsCenterModal" class="glass-modal">
+    <iframe src="https://lookerstudio.google.com/embed/reporting/2a55735c-1218-4170-8696-db6f06ad0725/page/p_pmwprespbd"
+            style="width:100%; height:100%; border:none; border-radius: 16px;"></iframe>
+    <button class="close-btn" onclick="closeLogistics('logisticsCenterModal')">❌</button>
+  </div>
+
+
+    <!-- CCTVSecurity -->
+<div id="CCTVSecurity" class="glass-modal">
+  <p style="position:absolute; z-index:20; left:12px; top:12px; margin:0;">
+    <a href="https://bpstech.online/d/e7cd0ba2-b2c8-4163-a95e-b6d540feb2f3/cctv-5-2-only-granfana?orgId=1&refresh=5s&from=1752598800000&to=1752632865506"
+       target="_blank" rel="noopener noreferrer"
+       style="font-size:16px; text-decoration:none; color:#00eaff;">
+      🌐 เปิด CCTV Security
+    </a>
+  </p>
+  <img
+    src="https://lh3.googleusercontent.com/d/1a-t4hwu9i4yu-_p_kG3FwPCoKr_wZRIB"
+    alt="CCTV Security Snapshot"
+    class="embed-media"
+  />
+  <button class="close-btn" onclick="closeLogistics('CCTVSecurity')">❌</button>
+</div>
+  
+
+  <div id="CCTV-WH" class="glass-modal">
+    <iframe src="https://supakit148.github.io/smart-dashboard/"
+            style="width:100%; height:100%; border:none; border-radius: 16px;"></iframe>
+    <button class="close-btn" onclick="closeLogistics('CCTV-WH')">❌</button>
+  </div>
+
+  <div id="CCTV-UDS" class="glass-modal">
+    <iframe src="https://supakit148.github.io/CCTV-UDS/"
+            style="width:100%; height:100%; border:none; border-radius: 16px;"></iframe>
+    <button class="close-btn" onclick="closeLogistics('CCTV-UDS')">❌</button>
+  </div>
+
+  <div id="CCTV-HQ" class="glass-modal">
+    <iframe src="https://supakit148.github.io/CCTV-HQ/"
+            style="width:100%; height:100%; border:none; border-radius: 16px;"></iframe>
+    <button class="close-btn" onclick="closeLogistics('CCTV-HQ')">❌</button>
+  </div>
+  
+
+<!-- ElectricalSystem -->
+<div id="ElectricalSystem" class="glass-modal">
+  <!-- ปุ่มเปิดพอร์ทัลในแท็บใหม่ -->
+  <p style="position:absolute; z-index:20; left:12px; top:12px; margin:0;">
+    <a href="https://bpstech.online/d/ad6df34b-7a83-4795-9f4f-fcb54b5024cf/evoair-rev1?orgId=1&from=1752549386683&to=1752552986683"
+       target="_blank" rel="noopener noreferrer"
+       style="font-size:16px; text-decoration:none; color:#00eaff;">
+      🌐 เปิด Electrical System
+    </a>
+  </p>
+
+  <!-- รูปพรีวิวจาก Google Drive (ใช้ lh3 + FILE_ID) -->
+  <img
+    src="https://lh3.googleusercontent.com/d/1M4BJVirXouSP49eXKZKpAxbTZEJn7jtn"
+    alt="Electrical System Snapshot"
+    class="embed-media"
+  />
+
+  <button class="close-btn" onclick="closeLogistics('ElectricalSystem')">❌</button>
+</div>
+
+  
+
+<!-- WaterSystem -->
+<div id="WaterSystem" class="glass-modal">
+  <p style="position:absolute; z-index:20; left:12px; top:12px; margin:0;">
+    <a href="https://bpstech.online/d/e398f637-3c20-4529-9ff4-517e8bf2b7d5/2ea5407a-6f7f-5825-8d08-da9c3d368296?orgId=1&refresh=5s&from=1735664400000&to=1767200399999"
+       target="_blank" rel="noopener noreferrer"
+       style="font-size:16px; text-decoration:none; color:#00eaff;">
+      🌐 เปิด Water System
+    </a>
+  </p>
+  <img
+    src="https://lh3.googleusercontent.com/d/1HGXB7d1w8sTiw2QbYfBB8Vo9F6fC-S06"
+    alt="Water System Snapshot"
+    class="embed-media"
+  />
+  <button class="close-btn" onclick="closeLogistics('WaterSystem')">❌</button>
+</div>
+
+  <div id="FreshAir" class="glass-modal">
+    <iframe src="https://bpstech.online/d/e292748b-da2c-4d29-9990-0262a6cd519e/air-q-demo-rev0?orgId=1&refresh=5s&from=now-1h&to=now"
+            style="width:100%; height:100%; border:none; border-radius: 16px;"></iframe>
+    <button class="close-btn" onclick="closeLogistics('FreshAir')">❌</button>
+  </div>
+  
+
+<!-- SolarCell -->
+<div id="SolarCell" class="glass-modal">
+  <p style="position:absolute; z-index:20; left:12px; top:12px; margin:0;">
+    <a href="https://docs.google.com/spreadsheets/d/1723prYCtb3ySIGvHYZDkekWP97k8IiKd5-pm9php-JE/edit?gid=1992529255#gid=1992529255"
+       target="_blank" rel="noopener noreferrer"
+       style="font-size:16px; text-decoration:none; color:#00eaff;">
+      🌐 เปิด Solar Cell Sheet
+    </a>
+  </p>
+  <img
+    src="https://lh3.googleusercontent.com/d/1VP3-U0l0QxFb8b-R3puq7EBJQcCKAITs"
+    alt="Solar Cell Snapshot"
+    class="embed-media"
+  />
+  <button class="close-btn" onclick="closeLogistics('SolarCell')">❌</button>
+</div>
+    
+
+  <div id="FiberOptic" class="glass-modal">
+      <a href="https://bpstech.online/d/fe15b960-5bda-4051-b87b-2bbec6d29461/project-fiber-check-material-rev1?orgId=1&from=1753376400000&to=1753416393714" target="_blank" style="font-size:18px; text-decoration:none;">
+    🌐 เปิด FiberOptic
+    <iframe src="https://lh3.googleusercontent.com/d/1LxJs-uOIxA41taRQ6FRO4Nhlw4hkRlTJ"
+            style="width:100%; height:100%; border:none; border-radius: 16px;"></iframe>
+            </a>
+    <button class="close-btn" onclick="closeLogistics('FiberOptic')">❌</button>
+  </div>
+  
+    <div id="Hik-Connect" class="glass-modal">
+      <!-- ปุ่มเปิดพอร์ทัลในแท็บใหม่ (ไม่ห่อมีเดีย) -->
+      <p style="position:absolute; z-index:20; left:12px; top:12px; margin:0;">
+        <a href="https://www.hik-connect.com/views/login/index.html#/portal"
+           target="_blank" rel="noopener noreferrer"
+           style="font-size:16px; text-decoration:none; color:#00eaff;">
+          🌐 เปิด Hik-Connect Portal
+        </a>
+      </p>
+      <!-- ภาพจาก Googleusercontent โชว์เต็มกรอบ -->
+      <img
+        src="https://lh3.googleusercontent.com/d/1HaZxGvMWF-H2eMs1PP5Bf3Sh-9vtP2X3"
+        alt="Hik-Connect Snapshot"
+        class="embed-media"
+      />
+      <button class="close-btn" onclick="closeLogistics('Hik-Connect')">❌</button>
+    </div>
+    
+    <div id="wastewater" class="glass-modal">
+      <!-- ปุ่มเปิดพอร์ทัลในแท็บใหม่ (ไม่ห่อมีเดีย) -->
+      <p style="position:absolute; z-index:20; left:12px; top:12px; margin:0;">
+        <a href="https://docs.google.com/spreadsheets/d/1CLEcM3Jv5liJzA5uH-9UmlEU4IusFMeZ33kpqSquQSU/edit?gid=1851982652#gid=1851982652"
+           target="_blank" rel="noopener noreferrer"
+           style="font-size:16px; text-decoration:none; color:#00eaff;">
+          🌐 เปิด wastewater
+        </a>
+      </p>
+      <!-- ภาพจาก Googleusercontent โชว์เต็มกรอบ -->
+      <img
+        src="https://lh3.googleusercontent.com/d/1CPAbNxQE1nMcq6ZCWbmalRrvfpMPaZ2W"
+        alt="Hik-Connect Snapshot"
+        class="embed-media"
+      />
+      <button class="close-btn" onclick="closeLogistics('wastewater')">❌</button>
+    </div>
+
+<div id="DataCenter" class="glass-modal">
+  <!-- ปุ่มเปิดพอร์ทัลในแท็บใหม่ -->
+  <p style="position:absolute; z-index:20; left:12px; top:12px; margin:0;">
+    <a href="https://docs.google.com/spreadsheets/d/10rFiP4EUaHjpDR7ziLOhdUPgomAt4FcKU1yIorZW3Uo/edit?gid=0#gid=0"
+       target="_blank" rel="noopener noreferrer"
+       style="font-size:16px; text-decoration:none; color:#00eaff;">
+      🌐 เปิด DataCenter
+    </a>
+  </p>
+
+  <!-- รูปตัวอย่างจาก Google Drive (ใช้เฉพาะไฟล์ไอดี) -->
+  <img
+    src="https://lh3.googleusercontent.com/d/1rC7skecn8HC-gJ5_VuF-kYFL3F1ej9gq"
+    alt="DataCenter Snapshot"
+    class="embed-media"
+  />
+
+  <button class="close-btn" onclick="closeLogistics('DataCenter')">❌</button>
+</div>
+
+<div id="CapsuleHouse" class="glass-modal">
+  <!-- ปุ่มเปิดพอร์ทัลในแท็บใหม่ -->
+  <p style="position:absolute; z-index:20; left:12px; top:12px; margin:0;">
+    <a href="https://docs.google.com/spreadsheets/d/1hqPn26smeMbPIWmUHdFPdH8jdTaeRsszXh_r6fu1LKs/edit?gid=1624916916#gid=1624916916"
+       target="_blank" rel="noopener noreferrer"
+       style="font-size:16px; text-decoration:none; color:#00eaff;">
+      🌐 เปิด Capsule House
+    </a>
+  </p>
+
+  <!-- รูปจาก Google Drive (ใช้เฉพาะไฟล์ไอดี) -->
+  <img
+    src="https://lh3.googleusercontent.com/d/1dGnmPgWmc0ck7NxEn4IvNnYc9cFdk9qf"
+    alt="Capsule House Snapshot"
+    class="embed-media"
+  />
+
+  <button class="close-btn" onclick="closeLogistics('CapsuleHouse')">❌</button>
+</div>
+
+
+<div id="SmartIOTMeter" class="glass-modal">
+  <!-- ปุ่มเปิดพอร์ทัลในแท็บใหม่ -->
+  <p style="position:absolute; z-index:20; left:12px; top:12px; margin:0;">
+    <a href="https://bpstech.online/goto/QAEfsWqNR?orgId=1"
+       target="_blank" rel="noopener noreferrer"
+       style="font-size:16px; text-decoration:none; color:#00eaff;">
+      🌐 เปิด Smart IOT Meter Monitoring
+    </a>
+  </p>
+
+  <!-- รูปตัวอย่างจาก Google Drive (ใช้เฉพาะไฟล์ไอดี) -->
+  <img
+    src="https://lh3.googleusercontent.com/d/1zsfzKvql6x1pQAMfeD_beq0BnSfoxAE-"
+    alt="Smart IOT Meter Monitoring Snapshot"
+    class="embed-media"
+  />
+
+  <button class="close-btn" onclick="closeLogistics('SmartIOTMeter')">❌</button>
+</div>
+
+<!-- Waston -->
+<div id="Waston" class="glass-modal">
+  <p style="position:absolute; z-index:20; left:12px; top:12px; margin:0;">
+    <a href="https://bpstech.online/d/fae530e8-c182-4544-9437-8a9bb9b4c41c/watson-electrical2b-cctv-rev2?orgId=1"
+       target="_blank" rel="noopener noreferrer"
+       style="font-size:16px; text-decoration:none; color:#00eaff;">
+      🌐 เปิด Waston
+    </a>
+  </p>
+  <img
+    src="https://lh3.googleusercontent.com/d/1tVVAVVVEe6P4_vFF2sGY4f8SuPvcvUlr"
+    alt="Waston Snapshot"
+    class="embed-media"
+  />
+  <button class="close-btn" onclick="closeLogistics('Waston')">❌</button>
+</div>
+
+<!-- CoolingTower -->
+<div id="CoolingTower" class="glass-modal">
+  <p style="position:absolute; z-index:20; left:12px; top:12px; margin:0;">
+    <a href="https://bpstech.online/d/f2ef21c6-6f1b-4df4-ae98-e9671e389903/cooling-tower?orgId=1&refresh=5s"
+       target="_blank" rel="noopener noreferrer"
+       style="font-size:16px; text-decoration:none; color:#00eaff;">
+      🌐 เปิด Cooling Tower
+    </a>
+  </p>
+  <img
+    src="https://lh3.googleusercontent.com/d/1YlFz0pZqbXOCCHJ2ue9dUvJOJGRhfBDu"
+    alt="Cooling Tower Snapshot"
+    class="embed-media"
+  />
+  <button class="close-btn" onclick="closeLogistics('CoolingTower')">❌</button>
+</div>
+
+<!-- CleanAirSystem -->
+<div id="CleanAirSystem" class="glass-modal">
+  <p style="position:absolute; z-index:20; left:12px; top:12px; margin:0;">
+    <a href="https://bpstech.online/d/f8b8d355-35d7-4c13-b223-262b23343700/air-gree?orgId=1&refresh=5s"
+       target="_blank" rel="noopener noreferrer"
+       style="font-size:16px; text-decoration:none; color:#00eaff;">
+      🌐 เปิด Clean Air System
+    </a>
+  </p>
+  <img
+    src="https://lh3.googleusercontent.com/d/15Qlxpt-1o8878sJ5sqkWRB45OmoFAudI"
+    alt="Clean Air System Snapshot"
+    class="embed-media"
+  />
+  <button class="close-btn" onclick="closeLogistics('CleanAirSystem')">❌</button>
+</div>
+
+<!-- FiberOptic (ถ้ามีอยู่แล้ว ให้แค่เอา href/src ไปอัปเดตของเดิม แทนการสร้างซ้ำ) -->
+<div id="FiberOptic2" class="glass-modal">
+  <p style="position:absolute; z-index:20; left:12px; top:12px; margin:0;">
+    <a href="https://bpstech.online/d/aef7eec2-fc42-4ce7-a66e-211aaeedc9d0/fiber-rev3?orgId=1&refresh=5s&kiosk"
+       target="_blank" rel="noopener noreferrer"
+       style="font-size:16px; text-decoration:none; color:#00eaff;">
+      🌐 เปิด Fiber Optic
+    </a>
+  </p>
+  <img
+    src="https://lh3.googleusercontent.com/d/11_H3sUdLT8HcRiTPvuof84JnUaAVcO91"
+    alt="Fiber Optic Snapshot"
+    class="embed-media"
+  />
+  <button class="close-btn" onclick="closeLogistics('FiberOptic2')">❌</button>
+</div>
+
+<!-- Wellness -->
+<div id="Wellness" class="glass-modal">
+  <p style="position:absolute; z-index:20; left:12px; top:12px; margin:0;">
+    <a href="https://bpstech.online/goto/IzrosZ3HR?orgId=1"
+       target="_blank" rel="noopener noreferrer"
+       style="font-size:16px; text-decoration:none; color:#00eaff;">
+      🌐 เปิด Wellness
+    </a>
+  </p>
+  <img
+    src="https://lh3.googleusercontent.com/d/1e9wX9vbuCkilZow842XNdQ0yaSTh-J2Q"
+    alt="Wellness Snapshot"
+    class="embed-media"
+  />
+  <button class="close-btn" onclick="closeLogistics('Wellness')">❌</button>
+</div>
+
+<!-- LogisticsCRM -->
+<div id="LogisticsCRM" class="glass-modal">
+  <p style="position:absolute; z-index:20; left:12px; top:12px; margin:0;">
+    <a href="https://www.appsheet.com/start/4e218eb9-bb53-4d44-98ba-2c3ae7ed1dda?platform=desktop#appName=%E0%B8%9C%E0%B8%A5%E0%B8%95%E0%B8%AD%E0%B8%9A%E0%B8%A3%E0%B8%B1%E0%B8%9A%E0%B8%88%E0%B8%B2%E0%B8%81%E0%B8%A5%E0%B8%B9%E0%B8%81%E0%B8%84%E0%B9%89%E0%B8%B2BPS%E0%B8%82%E0%B8%99%E0%B8%AA%E0%B9%88%E0%B8%87Responses-905143358&vss=H4sIAAAAAAAAA6WOsQ6CMBRF_-XO9Qe6GgdjcBDjYhkqfSSN0BJaUNL0320Nhlkd3305Jydg0vQovazv4NewXgeawREEznNPAlxga40fbCvABI6yW8ZTsSlpmHSd7ohYsY_CkwMPXxv43w0MWpHxutE0ZF2Gk2ZB0zuDeVgxRIZu9PLW0rs8YTGmrbH16EhdUtBvIW5vds9eGlVYlayNbB3FF_4SD-l0AQAA&view=CRM-Service"
+       target="_blank" rel="noopener noreferrer"
+       style="font-size:16px; text-decoration:none; color:#00eaff;">
+      🌐 เปิด LogisticsCRM
+    </a>
+  </p>
+
+  <!-- ใช้เฉพาะไฟล์ไอดี: 1CvWq2nJSVvV0mT173NnTF84HkvR0_qkY -->
+  <img
+    src="https://lh3.googleusercontent.com/d/1CvWq2nJSVvV0mT173NnTF84HkvR0_qkY"
+    alt="LogisticsCRM Snapshot"
+    class="embed-media"
+  />
+
+  <button class="close-btn" onclick="closeLogistics('LogisticsCRM')">❌</button>
+</div>
+
+
+<div id="fusionsolar" class="glass-modal">
+  <!-- ปุ่มเปิดพอร์ทัลในแท็บใหม่ -->
+  <p style="position:absolute; z-index:20; left:12px; top:12px; margin:0;">
+    <a href="https://sg5.fusionsolar.huawei.com/uniportal/pvmswebsite/assets/build/cloud.html?app-id=smartpvms&instance-id=smartpvms&zone-id=region-7-dc86060b-2d0d-4045-9ada-82aa1a5a9b0c#/home/list"
+       target="_blank" rel="noopener noreferrer"
+       style="font-size:16px; text-decoration:none; color:#00eaff;">
+      🌐 เปิด FusionSolar
+    </a>
+  </p>
+
+  <!-- ภาพตัวอย่างจาก Google Drive (ใช้เฉพาะ file ID) -->
+  <img
+    src="https://lh3.googleusercontent.com/d/1b3WJmr-NLU-O31XCqWyNfxMSOnhKst_U"
+    alt="FusionSolar Snapshot"
+    class="embed-media"
+  />
+
+  <button class="close-btn" onclick="closeLogistics('fusionsolar')">❌</button>
+</div>
+
+
+
+  <!-- https://bpstech.online/d/fe15b960-5bda-4051-b87b-2bbec6d29461/project-fiber-check-material-rev1?orgId=1&from=1753376400000&to=1753416393714
+  <!-- 🔊 Audio Visualizer -->
+  <div class="audio-bars-container">
+    <div class="bars" id="audioBars"></div>
+  </div>
+  
+
+  <script>
+    // Visualizer
+    const barCount = 90;
+    const container = document.getElementById('audioBars');
+    for (let i = 0; i < barCount; i++) {
+      const bar = document.createElement('div');
+      bar.className = 'bar';
+      container.appendChild(bar);
+    }
+    setInterval(() => {
+      document.querySelectorAll('.audio-bars-container .bar').forEach(bar => {
+        const height = Math.floor(Math.random() * 60) + 20;
+        bar.style.height = `${height}px`;
+      });
+    }, 250);
+
+    // Title Animation
+    const titleElement = document.getElementById('animatedTitle');
+    const fullText = 'Digital Twin';
+    const codeChars = '█▓▒░<>#@*%&?!';
+    let currentIndex = 0;
+    let animationStep = 0;
+    let displayText = '';
+    let isDeleting = false;
+
+    function scrambleText(text, length) {
+      let scrambled = '';
+      for (let i = 0; i < length; i++) {
+        scrambled += codeChars.charAt(Math.floor(Math.random() * codeChars.length));
+      }
+      return scrambled;
+    }
+
+    function animateTitle() {
+      if (!isDeleting) {
+        if (currentIndex < fullText.length) {
+          displayText = fullText.substring(0, currentIndex + 1);
+          const scrambled = scrambleText('', fullText.length - currentIndex - 1);
+          titleElement.innerText = displayText + scrambled;
+          currentIndex++;
+        } else {
+          if (animationStep < 15) {
+            animationStep++;
+          } else {
+            isDeleting = true;
+            animationStep = 0;
+          }
+        }
+      } else {
+        if (currentIndex > 0) {
+          currentIndex--;
+          displayText = fullText.substring(0, currentIndex);
+          const scrambled = scrambleText('', fullText.length - currentIndex);
+          titleElement.innerText = displayText + scrambled;
+        } else {
+          isDeleting = false;
+        }
+      }
+      setTimeout(animateTitle, 80);
+    }
+
+    animateTitle();
+  </script>
+
+  <script>
+    function updateClock() {
+      const now = new Date();
+      const hours = String(now.getHours()).padStart(2, '0');
+      const minutes = String(now.getMinutes()).padStart(2, '0');
+      const seconds = String(now.getSeconds()).padStart(2, '0');
+      document.getElementById('clock').textContent = `${hours}:${minutes}:${seconds}`;
+
+      const options = { weekday: 'long', month: 'long', day: 'numeric' };
+      const dateString = now.toLocaleDateString(undefined, options);
+      document.getElementById('date').textContent = dateString;
+    }
+
+    updateClock();
+    setInterval(updateClock, 1000);
+  </script>
+
+  <script>
+  fetch("https://docs.google.com/spreadsheets/d/e/2PACX-1vSCb61sTIyqhqss13xwnWnANho_EXFOIJK_oa3Ig1a6audH72wrWCwGaJwv8XMuaUxamCldtrDolHVr/pub?gid=0&single=true&output=csv")
+    .then(response => response.text())
+    .then(csv => {
+      const rows = csv.trim().split("\n").map(r => r.split(","));
+      let html = '<table border="1" cellpadding="6" cellspacing="0" style="border-collapse: collapse; font-size:16px; width:100%;">';
+
+      // Header
+      html += "<thead><tr>";
+      rows[0].forEach(col => html += `<th>${col}</th>`);
+      html += "</tr></thead><tbody>";
+
+      // Data
+      for (let i = 1; i < rows.length; i++) {
+        html += "<tr>";
+        rows[i].forEach(cell => {
+          let color = "";
+          if (cell.toLowerCase().includes("offline")) {
+            color = "color: white;";
+          } else if (cell.toLowerCase().includes("online")) {
+            color = "color: white;";
+          }
+          html += `<td style="${color}">${cell}</td>`;
+        });
+        html += "</tr>";
+      }
+
+      html += "</tbody></table>";
+      document.getElementById("cctv-status-table").innerHTML = html;
+    });
+  </script>
+
+  <script>
+  fetch("https://docs.google.com/spreadsheets/d/1723prYCtb3ySIGvHYZDkekWP97k8IiKd5-pm9php-JE/export?format=csv&gid=456184011")
+    .then(response => response.text())
+    .then(csv => {
+      const rows = csv.trim().split("\n").map(r => r.split(","));
+      let html = '<table border="1" cellpadding="6" cellspacing="0" style="border-collapse: collapse; font-size:16px; width:100%;">';
+
+      // Header
+      html += "<thead><tr>";
+      rows[0].forEach(col => html += `<th>${col}</th>`);
+      html += "</tr></thead><tbody>";
+
+      // Data
+      for (let i = 1; i < rows.length; i++) {
+        html += "<tr>";
+        rows[i].forEach(cell => {
+          // ตรวจสอบถ้ามีคำว่า 'Offline' หรือ 'Online'
+          let color = "";
+          if (cell.toLowerCase().includes("offline")) {
+            color = "color: white;";
+          } else if (cell.toLowerCase().includes("online")) {
+            color = "color: white;";
+          }
+          html += `<td style="${color}">${cell}</td>`;
+        });
+        html += "</tr>";
+      }
+
+      html += "</tbody></table>";
+      document.getElementById("link-to-grafana").innerHTML = html;
+    });
+  </script>
+
+  <script>
+  fetch("https://docs.google.com/spreadsheets/d/1Bbr3N3UjtIMpI1dlIwKBLOYn-_avAWDkgWPln4XxfdQ/export?format=csv&gid=1585725188")
+    .then(response => response.text())
+    .then(csv => {
+      const rows = csv.trim().split("\n").map(r => r.split(","));
+      let html = '<table border="1" cellpadding="6" cellspacing="0" style="border-collapse: collapse; font-size:16px; width:100%;">';
+
+      // สร้างส่วนหัวตาราง
+      html += "<thead><tr>";
+      rows[0].forEach(col => html += `<th>${col}</th>`);
+      html += "</tr></thead><tbody>";
+
+      // สร้างข้อมูลในแต่ละแถว
+      for (let i = 1; i < rows.length; i++) {
+        html += "<tr>";
+        rows[i].forEach(cell => {
+          let style = "";
+          const lower = cell.toLowerCase();
+          if (lower.includes("offline")) {
+            style = "color:white; font-weight:bold;";
+          } else if (lower.includes("online")) {
+            style = "color:white; font-weight:bold;";
+          }
+          html += `<td style="${style}">${cell}</td>`;
+        });
+        html += "</tr>";
+      }
+
+      html += "</tbody></table>";
+      document.getElementById("logistics-table").innerHTML = html;
+    });
+  </script>
+
+  <script>
+  function toggleMiniPanel() {
+    const panel = document.getElementById('miniPanel');
+    panel.style.display = panel.style.display === 'none' ? 'block' : 'none';
+  }
+  </script>
+
+  <script>
+  function openLogistics(modalId) {
+    const modal = document.getElementById(modalId);
+    modal.classList.add("active");
+  }
+
+  function closeLogistics(modalId) {
+    const modal = document.getElementById(modalId);
+    modal.classList.remove("active");
+  } 
+  </script>
+
+  <script>
+  let autoViewRunning = false;
+  let autoViewTimer = null;
+  let autoViewButton = null;
+  let index = 0;
+
+  const modals = [
+    'logisticsCenterModal',
+    'CCTV-WH',
+    'CCTV-UDS',
+    'CCTV-HQ',
+    'SolarCell',
+    'BUILDING_OVERVIEW',
+    '3D_Digital',
+    '4D_Digital',
+    'Hik-Connect' // ✅ เพิ่มเพื่อให้ closeAllModals() ปิดได้
+  ];
+
+  const buttonMap = {
+    'Hik-Connect': 'Hik-Connect',
+    'logisticsCenterModal': 'Logistics',
+    'CCTV-WH': 'CCTV-WH',
+    'CCTV-UDS': 'CCTV-UDS',
+    'CCTV-HQ': 'CCTV-HQ',
+    'SolarCell': 'Solar Cell',
+    'BUILDING_OVERVIEW': 'Building Overview',
+    '3D_Digital': '3D Digital Twin',
+    '4D_Digital': '4D Digital Twin'
+  };
+
+  function closeAllModals() {
+    modals.forEach(id => document.getElementById(id).classList.remove("active"));
+  }
+
+  function removeButtonHighlights() {
+    document.querySelectorAll(".menu-buttons button").forEach(btn => {
+      btn.classList.remove("highlight");
+    });
+  }
+
+
+  </script>
+
+  <script>
+    function setBackgroundByTime() {
+      const hour = new Date().getHours();
+      const iframe = document.getElementById("background-frame");
+
+      let src = "";
+      if (hour >= 0 && hour < 8) {
+        src = "https://sketchfab.com/models/65a75a890cfe4b63b1e3c7e41e524e36/embed?autostart=1&annotations_visible=0&annotation_cycle=5";
+      } else if (hour >= 8 && hour < 16) {
+        src = "https://sketchfab.com/models/fd7092ffbe88421dbbf9e19dd36894e9/embed?autostart=1&annotations_visible=0&annotation_cycle=5";
+      } else {
+        src = "https://sketchfab.com/models/9fe00d65cf0c4dec92cf1c6fb7be9e02/embed?autostart=1&annotations_visible=0&annotation_cycle=5";
+      }
+
+      iframe.src = src;
+    }
+
+    setBackgroundByTime();
+  </script>
+
+  <script>
+    function formatCeil2(num) {
+        const n = parseFloat(num);
+        if (isNaN(n)) return num; // ถ้าไม่ใช่ตัวเลข คืนค่าเดิม
+        return Math.ceil(n * 100) / 100;
+    }
+
+    function getTextFromGoogleSheet(cameraId) {
+      const sheetID = "1pG8ldAgtHsOzlVxjITuBp2XCS77Sdk15fvmR-YU-MDg";
+      const sheetName = "Data_EachFloor";
+      const url = `https://docs.google.com/spreadsheets/d/${sheetID}/gviz/tq?tqx=out:json&sheet=${encodeURIComponent(sheetName)}`;
+
+      fetch(url)
+        .then(res => res.text())
+        .then(data => {
+          const jsonData = JSON.parse(data.substr(47).slice(0, -2));
+          const rows = jsonData.table.rows;
+
+          for (let i = 0; i < rows.length; i++) {
+            const row = rows[i].c;
+            if (row[0] && row[0].v === cameraId) {
+            
+              // กล้องตัวแทนชั้น
+              const img0  = row[25]?.v || '';
+              const modalImg0 = document.getElementById("modalImg0");
+              if (modalImg0 && img0) modalImg0.src = img0;
+              
+              // กล้อง 1
+              const img1  = row[2]?.v || '';
+              const text1 = row[1]?.v || 'ไม่พบข้อมูล';
+              const text1_2 = row[23]?.v || 'ไม่พบข้อมูล';
+              document.getElementById("name1").innerText = text1_2;
+              const modalImg1 = document.getElementById("modalImg1");
+              if (modalImg1 && img1) modalImg1.src = img1;
+              document.getElementById("datetime1").innerText = text1;
+              
+              
+              // กล้องที่กำลังเลือก
+              const img9  = row[2]?.v || '';
+              document.getElementById("name9").innerText = text1_2;
+              const modalImg9 = document.getElementById("modalImg9");
+              if (modalImg9 && img9) modalImg9.src = img9;
+              document.getElementById("datetime9").innerText = text1;
+              
+            // กล้องที่กำลังเลือก (ด้านล่างอันใหญ่)
+              const img10  = row[2]?.v || '';
+              const modalImg10 = document.getElementById("modalImg10");
+              if (modalImg10 && img10){
+                modalImg10.src = img10;
+                document.getElementById('bottomCam').classList.add('active'); // ← เปิดด้วยคลาส
+              }
+
+              /* ----- ส่งค่า img10 ไป Apps Script CacheService ----- */
+              (() => {
+                try {
+                  const WEB_APP_URL = "https://script.google.com/macros/s/AKfycbzZ5pH_WfizUxN_lWukkyGiYp3UQTuKd_Nwbv5Ia8Xc_-flmWXOfGhhArTlDhrXC_xi/exec"; // 👈 ใส่ลิงก์ Web App ของคุณ
+              
+                  if (window.__lastImg10Value__ === img10) return; // กันยิงซ้ำค่าเดิม
+                  window.__lastImg10Value__ = img10;
+              
+                  fetch(WEB_APP_URL, {
+                    method: "POST",
+                    mode: "no-cors",  // ✅ เพิ่มบรรทัดนี้
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({ img: img10 })
+                  }).catch(err => console.warn("❌ ส่งค่า img10 ไม่สำเร็จ:", err));
+                } catch (err) {
+                  console.warn("Write Cache failed:", err);
+                }
+              })();   
+
+              // กล้อง 2 (ถัดแถว)
+              const row2  = rows[i+1]?.c || [];
+              const img2  = row2[2]?.v || '';
+              const text2 = row2[1]?.v || 'ไม่พบข้อมูล';
+              const text2_2 = row2[23]?.v || 'ไม่พบข้อมูล';
+              document.getElementById("name2").innerText = text2_2;
+              const modalImg2 = document.getElementById("modalImg2");
+              if (modalImg2 && img2) modalImg2.src = img2;
+              document.getElementById("datetime2").innerText = text2;
+              
+              
+              // กล้อง 3 (ถัดแถว)
+              const row3  = rows[i+2]?.c || [];
+              const img3  = row3[2]?.v || '';
+              const text3 = row3[1]?.v || 'ไม่พบข้อมูล';
+              const text3_2 = row3[23]?.v || 'ไม่พบข้อมูล';
+              document.getElementById("name3").innerText = text3_2;
+              const modalImg3 = document.getElementById("modalImg3");
+              if (modalImg3 && img3) modalImg3.src = img3;
+              document.getElementById("datetime3").innerText = text3;
+              
+              
+              // กล้อง 4 (ถัดแถว)
+              const row4  = rows[i+3]?.c || [];
+              const img4  = row4[2]?.v || '';
+              const text4 = row4[1]?.v || 'ไม่พบข้อมูล';
+              const text4_2 = row4[23]?.v || 'ไม่พบข้อมูล';
+              document.getElementById("name4").innerText = text4_2;
+              const modalImg4 = document.getElementById("modalImg4");
+              if (modalImg4 && img4) modalImg4.src = img4;
+              document.getElementById("datetime4").innerText = text4;
+              
+              
+              // กล้อง 5 (ถัดแถว)
+              const row5  = rows[i+4]?.c || [];
+              const img5  = row5[2]?.v || '';
+              const text5 = row5[1]?.v || 'ไม่พบข้อมูล';
+              const text5_2 = row5[23]?.v || 'ไม่พบข้อมูล';
+              document.getElementById("name5").innerText = text5_2;
+              const modalImg5 = document.getElementById("modalImg5");
+              if (modalImg5 && img5) modalImg5.src = img5;
+              document.getElementById("datetime5").innerText = text5;
+              
+
+              // กล้อง 6 (ถัดแถว)
+              const row6  = rows[i+5]?.c || [];
+              const img6  = row6[2]?.v || '';
+              const text6 = row6[1]?.v || 'ไม่พบข้อมูล';
+              const text6_2 = row6[23]?.v || 'ไม่พบข้อมูล';
+              document.getElementById("name6").innerText = text6_2;
+              const modalImg6 = document.getElementById("modalImg6");
+              if (modalImg6 && img6) modalImg6.src = img6;
+              document.getElementById("datetime6").innerText = text6;
+              
+              
+              // กล้อง 7 (ถัดแถว)
+              const row7  = rows[i+6]?.c || [];
+              const img7  = row7[2]?.v || '';
+              const text7 = row7[1]?.v || 'ไม่พบข้อมูล';
+              const text7_2 = row7[23]?.v || 'ไม่พบข้อมูล';
+              document.getElementById("name7").innerText = text7_2;
+              const modalImg7 = document.getElementById("modalImg7");
+              if (modalImg7 && img7) modalImg7.src = img7;
+              document.getElementById("datetime7").innerText = text7;
+              
+              
+              // กล้อง 8 (ถัดแถว)
+              const row8  = rows[i+7]?.c || [];
+              const img8  = row8[2]?.v || '';
+              const text8 = row8[1]?.v || 'ไม่พบข้อมูล';
+              const text8_2 = row8[23]?.v || 'ไม่พบข้อมูล';
+              document.getElementById("name8").innerText = text8_2;
+              const modalImg8 = document.getElementById("modalImg8");
+              if (modalImg8 && img8) modalImg8.src = img8;
+              document.getElementById("datetime8").innerText = text8;
+              
+                const para1 = row[3]?.v ?? 'ไม่พบข้อมูล';
+                const para2 = row[4]?.v ?? 'ไม่พบข้อมูล';
+                const para3 = row[5]?.v ?? 'ไม่พบข้อมูล';
+                const para4 = row[6]?.v ?? 'ไม่พบข้อมูล';
+                              
+                const para5 = row[7]?.v ?? 'ไม่พบข้อมูล';
+                const para6 = row[8]?.v ?? 'ไม่พบข้อมูล';
+                const para7 = row[9]?.v ?? 'ไม่พบข้อมูล';
+                const para8 = row[10]?.v ?? 'ไม่พบข้อมูล';
+                                
+                const para9 = row[11]?.v ?? 'ไม่พบข้อมูล';
+                const para10 = row[12]?.v ?? 'ไม่พบข้อมูล';
+                const para11 = row[13]?.v ?? 'ไม่พบข้อมูล';
+                const para12 = row[14]?.v ?? 'ไม่พบข้อมูล';
+                                
+                const para13 = row[15]?.v ?? 'ไม่พบข้อมูล';
+                const para14 = row[16]?.v ?? 'ไม่พบข้อมูล';
+                const para15 = row[17]?.v ?? 'ไม่พบข้อมูล';
+                const para16 = row[18]?.v ?? 'ไม่พบข้อมูล';
+                                
+                const para17 = row[19]?.v ?? 'ไม่พบข้อมูล';
+                const para18 = row[20]?.v ?? 'ไม่พบข้อมูล';
+                const para19 = row[21]?.v ?? 'ไม่พบข้อมูล';
+                const para20 = row[22]?.v ?? 'ไม่พบข้อมูล';
+                
+                const para21 = row[24]?.v ?? 'ไม่พบข้อมูล';
+                
+                document.getElementById("infoBox2").innerHTML = para1;
+                document.getElementById("infoBox3").innerHTML = para2;
+                document.getElementById("infoBox4").innerHTML = para3;
+                document.getElementById("infoBox5").innerHTML = para4;
+                             
+                document.getElementById("infoBox6").innerHTML  = formatCeil2(para5)  + "V";
+                document.getElementById("infoBox7").innerHTML  = formatCeil2(para6)  + "A";
+                document.getElementById("infoBox8").innerHTML  = formatCeil2(para7)  + "Hz";
+                document.getElementById("infoBox9").innerHTML  = formatCeil2(para8)  + "kW";
+                                
+                document.getElementById("infoBox10").innerHTML = formatCeil2(para9)  + "<br>L/min";
+                document.getElementById("infoBox11").innerHTML = formatCeil2(para10) + "<br>Days";
+                document.getElementById("infoBox12").innerHTML = formatCeil2(para11) + "<br>Months";
+                document.getElementById("infoBox13").innerHTML = formatCeil2(para12) + "<br>Liter";
+                                
+                document.getElementById("infoBox14").innerHTML = formatCeil2(para13) + "C";
+                document.getElementById("infoBox15").innerHTML = formatCeil2(para14) + "%RH";
+                document.getElementById("infoBox16").innerHTML = formatCeil2(para15) + "ug";
+                document.getElementById("infoBox17").innerHTML = formatCeil2(para16) + "ug";
+                                
+                document.getElementById("infoBox18").innerHTML = formatCeil2(para17) + "ug";
+                document.getElementById("infoBox19").innerHTML = formatCeil2(para18) + "ug";
+                document.getElementById("infoBox20").innerHTML = formatCeil2(para19) + "<br>ppm";
+                document.getElementById("infoBox21").innerHTML = formatCeil2(para20) + "<br>ppm";
+             
+                document.getElementById("NumberFloor").innerHTML = para21;
+                
+                const para22 = row[33]?.v ?? 'ไม่พบข้อมูล';
+                const para23 = row[34]?.v ?? 'ไม่พบข้อมูล';
+                const para24 = row[35]?.v ?? 'ไม่พบข้อมูล';
+       
+                document.getElementById("in9").innerHTML = para22;
+                document.getElementById("out9").innerHTML = para23;
+                document.getElementById("occ9").innerHTML = para24;
+                
+                /* อัปเดต badge ด้านซ้าย (สถานะ) */
+                const p21 = document.getElementById("Para21Label");
+                if (p21) p21.textContent = para21;
+                
+                /* ถ้าต้องการให้ NumberFloor ยังแสดงชั้นตามเดิม และเคยใช้ para21 แทน
+                   สามารถคงไว้ได้ หรือถ้าคุณมีเลขชั้นจากที่อื่น ให้เปลี่ยนมาใช้ค่านั้นแทน */
+                // document.getElementById("NumberFloor").innerHTML = para21;
+                                
+                if (p21){
+                  p21.textContent = para21;
+                  p21.classList.remove('is-bps','is-alert','is-normal');
+                  const v = String(para21).toUpperCase();
+                  if (v.includes('BPS'))        p21.classList.add('is-bps');
+                  else if (v.includes('ALERT')) p21.classList.add('is-alert');
+                  else                          p21.classList.add('is-normal');
+                }
+
+              break;
+            }
+          }
+        })
+        .catch(err => console.error("❌ Error loading Google Sheet:", err));
+    }
+    
+
+  // === CONFIG: Mapping annotation name → model UID =========================
+  const MODEL_START = 'bba589f10d9f4351be150a2aa24d753b'; // โมเดลรวมเริ่มต้น
+  //สำรอง 2ad3a8196b044923b2cfdf5634595866
+  //สำรอง 6a3d574afb3b447986604c9ab478ac12
+  //สำรอง 7adcd28260174cf58dd2672e1e189426
+  //สำรอง WH-2e29b7e958b84f4e8741a5f3cedbfb79
+    
+  const ANNO_TO_MODEL = {
+    'BPS-Inside' : '937eb9eaca09469184a806982658b4cd',
+    '1st_Floor' : '78c790b7e74843139138cac1d852f05d',
+    'M_Floor'   : '69350240005d4d43ae8800c5b7ab79d7',
+    '2nd_Floor' : 'fae2731cfddc4b9dab3f43bed1724857',
+    '3rd_Floor' : 'f5034d3514414c92aa4dc5d95c6513e7',
+    '4th_Floor' : '317cf905f70c4e6fbce4beee8206c446',
+    'Roof_Level': 'aeafd4ec7a1b49de83510bb3cf08bc7b',
+    'WH' : '08eadf1b0ada4181a3275df858b40fd9',
+    'UDS' : 'b9bf5ba8428247b69fc6a772b9b1b649'
+  };
+  // ========================================================================
+
+  const iframe  = document.getElementById('skfb-frame');
+  const client  = new Sketchfab(iframe);
+
+  let activeUID   = null;
+  let apiRef      = null;
+
+  // ใช้ฟังก์ชันเดิมของคุณ: formatCeil2(), getTextFromGoogleSheet() ฯลฯ
+
+  function initModel(uid){
+    if (activeUID && uid === activeUID) return;   // กันโหลดซ้ำตัวเดิม
+    
+    activeUID = uid;
+    client.init(uid, {
+      autostart: 1,
+      preload: 1,
+      ui_infos: 0,
+      ui_inspector: 0,
+      ui_stop: 0,
+      ui_watermark_link: 0,
+      success: function(api){
+        apiRef = api;
+        api.start();
+
+        api.addEventListener('viewerready', function(){
+          const handler = function(index){
+            api.getAnnotation(index, function(err, ann){
+              if (err || !ann) return;
+
+              // ---- พฤติกรรม "เดิม" ของคุณ: อัปเดตชื่อ/ข้อมูลจาก Google Sheet ----
+              const CameraName = (ann.name || ann.title || '').trim();
+              renderFloorMapFromSheet(CameraName, /* activeName */ CameraName);
+              document.getElementById('cameraNameBox1').innerText = "Digital Building - " + CameraName;
+              document.getElementById('cameraNameBox2').innerText = "Digital Building - " + CameraName;
+
+              // โหลดข้อมูลแผ่น/การ์ด/ค่า metric ตามชื่อ CameraName (ฟังก์ชันเดิมของคุณ)
+              getTextFromGoogleSheet(CameraName);
+
+              // BUILDING vs FLOOR label + ซ่อน/โชว์การ์ด (ตรรกะเดิม)
+              if (CameraName === "BPS_HQ") {
+                document.getElementById('BuildorFloor').innerText = "BUILDING";
+                hideAll();
+              } else {
+                document.getElementById('BuildorFloor').innerText = "FLOOR";
+                showAll();
+              }
+              // --------------------------------------------------------------------
+              // 🔸 เพิ่มตรงนี้: ถ้าชื่อ annotation ลงท้ายด้วย "0" ซ่อน CCTV9 ไม่ให้แสดง
+              if (endsWithZero(CameraName) || CameraName === "BPS_HQ") {
+                setVisible('CCTV9', false);
+              } else {
+                setVisible('CCTV9', true);
+              }
+
+              // ถ้ามี mapping ชื่อ annotation → โมเดล ให้สลับไปโมเดลนั้น
+              const targetUID = ANNO_TO_MODEL[CameraName];
+              if (targetUID && targetUID !== activeUID){
+                initModel(targetUID);
+                hideAll();
+              }
+            });
+          };
+          // รองรับทั้งสองอีเวนต์ของ Sketchfab
+          api.addEventListener('annotationFocus',  handler);
+          api.addEventListener('annotationSelect', handler);
+        });
+      },
+      error: function(){ console.error('Sketchfab init error:', uid); }
+    });
+  }
+
+
+  // เริ่มต้นที่โมเดลรวม
+  initModel(MODEL_START);
+
+
+
+
+  </script>
+  
+  <script>
+    // ===== ฟังก์ชันโชว์/ซ่อนการ์ดใน Dock (ถ้าต้องการใช้) =====
+    function openLogistics(id){ document.getElementById(id)?.classList.add('active'); }
+    function closeLogistics(id){ document.getElementById(id)?.classList.remove('active'); }
+
+    function setVisible(id, visible){
+      const el = document.getElementById(id);
+      if (!el) return;
+      el.style.display = visible ? '' : 'none';
+    }
+    function showAll(){ 
+        for(let i=1;i<=9;i++) setVisible('CCTV'+i, true); 
+        for(let i=1;i<=2;i++) setVisible('cameraNameBox'+i, true); 
+    }
+    function hideAll(){ 
+        for(let i=1;i<=9;i++) setVisible('CCTV'+i, false); 
+        for(let i=1;i<=2;i++) setVisible('cameraNameBox'+i, false); 
+    }
+    function hideCenterCCTV(){
+        setVisible('CCTV9', false);
+    }
+  </script>
+  
+<script>
+  // ข้อมูล (แนวนอน = y คือหมวดหมู่, x คือค่า)
+  var years = ['2023','2024','2025'];
+
+  var trace1 = { 
+    y: years,
+    x: [20,14,23],
+    name: 'Intruder',
+    type: 'bar',
+    orientation: 'h',
+    marker: {
+      color: '#00eaff',
+      line: { width: 1.5, color: '#00ffff' }
+    }
+  };
+
+  var trace2 = { 
+    y: years,
+    x: [12,18,29],
+    name: 'Offline',
+    type: 'bar',
+    orientation: 'h',
+    marker: {
+      color: '#007bff',
+      line: { width: 1.5, color: '#00ffff' }
+    }
+  };
+
+  var data = [trace1, trace2];
+
+  // คำนวณ max เพื่อขยายแกน x ให้แท่ง “ยาว” เต็มพื้นที่
+  var maxX = Math.max(...trace1.x, ...trace2.x);
+  var layout = { 
+    barmode: 'group',
+    bargap: 0.25,
+    title: {
+    text: 'Alarm Summary',      
+    font: { family: 'Orbitron, sans-serif', size: 20, color: '#00ffff' }
+    },
+    paper_bgcolor: 'rgba(0,0,0,0)',
+    plot_bgcolor: 'rgba(0,0,0,0)',
+    font: { family: 'Orbitron, sans-serif', color: '#e0faff' },
+
+    // แกนแนวนอน (ความยาวของแท่ง)
+    xaxis: {
+      range: [0, Math.ceil(maxX * 1.25)],   // ขยาย 25% ให้แท่งดูยาวขึ้น
+      gridcolor: '#00ffff33',
+      tickfont: { color: '#00ffff' },
+      zeroline: false
+    },
+
+    // แกนรายการ (ปี)
+    yaxis: {
+      tickfont: { color: '#00ffff' },
+      gridcolor: '#00ffff22',
+      automargin: true
+    },
+
+    // Legend ล่าง แนวนอน
+    legend: {
+      orientation: 'h',
+      x: 0.5, xanchor: 'center',
+      y: -0.2, yanchor: 'top',
+      font: { color: '#00ffff' },
+      bgcolor: 'rgba(0,0,0,0)'
+    },
+
+    margin: { l: 60, r: 12, t: 48, b: 60 }
+  };
+
+  var config = { displayModeBar: false, responsive: true };
+
+  Plotly.newPlot('groupedBar', data, layout, config);
+</script>
+
+<script>
+  var dataFloor = [{
+    values: [15, 20, 25, 18, 22],  
+    labels: ['1st_Floor', '2nd_Floor', '3rd_Floor', '4th_Floor', '5th_Floor (M_Floor)'],
+    type: 'pie',
+    hole: .4, // Donut
+    marker: {
+      colors: ['#00eaff','#00bfff','#0099ff','#007bff','#0055ff'],
+      line: { color: '#00ffff', width: 2 }
+    },
+    textinfo: "label+percent",
+    textfont: { family: 'Orbitron, sans-serif', color: '#e0faff', size: 13 }
+  }];
+
+  var layoutFloor = {
+    paper_bgcolor: 'rgba(0,0,0,0)',
+    plot_bgcolor: 'rgba(0,0,0,0)',
+    font: { family: 'Orbitron, sans-serif', color: '#e0faff' },
+    legend: {
+      orientation: 'h',
+      x: 0.5, xanchor: 'center',
+      y: -0.3, yanchor: 'top',
+      font: { color: '#00ffff' },
+      bgcolor: 'rgba(0,0,0,0)'
+    },
+    margin: { t: 20, b: 60 }
+  };
+
+  Plotly.newPlot('floorDonut', dataFloor, layoutFloor, {displayModeBar: false, responsive: true});
+</script>
+
+<script>
+  var trace1 = {
+    x: ['10:00','11:00','12:00','13:00','14:00'], // เวลา (Time)
+    y: [10, 25, 18, 30, 45], // ปริมาณ (Volume)
+    fill: 'tozeroy',
+    type: 'scatter',
+    mode: 'lines',
+    line: { color: '#00eaff', width: 3 },
+    fillcolor: 'rgba(0, 255, 255, 0.25)',
+    name: 'Volume'
+  };
+
+  var data = [trace1];
+
+  var layout = { 
+    title: {
+      text: 'Area Chart',
+      font: { family: 'Orbitron, sans-serif', size: 22, color: '#00ffff' }
+    },
+    paper_bgcolor: 'rgba(0,0,0,0)',
+    plot_bgcolor: 'rgba(0,0,0,0)',
+    font: { family: 'Orbitron, sans-serif', color: '#e0faff' },
+    xaxis: {
+      title: { text: 'Time', font: { color: '#00ffff' } },
+      tickfont: { color: '#00ffff' },
+      gridcolor: '#00ffff33',
+      zeroline: false
+    },
+    yaxis: {
+      title: { text: 'Volume', font: { color: '#00ffff' } },
+      tickfont: { color: '#00ffff' },
+      gridcolor: '#00ffff33',
+      zeroline: false
+    },
+    legend: {
+      orientation: 'h',
+      x: 0.5, xanchor: 'center',
+      y: -0.2, yanchor: 'top',
+      font: { color: '#00ffff' },
+      bgcolor: 'rgba(0,0,0,0)'
+    },
+    margin: { l: 70, r: 30, t: 60, b: 80 }
+  };
+
+  Plotly.newPlot('area', data, layout, {displayModeBar: false, responsive: true});
+</script>
+
+<script>
+  var radarData = [{
+    type: 'scatterpolar',
+    r: [39, 28, 15, 20, 45, 39], // ค่าตัวอย่างของแต่ละ parameter
+    theta: ['PM2.5','PM10','TVDC','CH2O','CO2','PM2.5'], // ปิด loop ด้วย PM2.5
+    fill: 'toself',
+    name: 'Environment',
+    line: { color: '#00eaff', width: 3 },
+    fillcolor: 'rgba(0, 255, 255, 0.25)'
+  }];
+
+  var radarLayout = {
+    title: {
+      text: 'Air Quality Parameters',
+      font: { family: 'Orbitron, sans-serif', size: 22, color: '#00ffff' }
+    },
+    polar: { 
+      bgcolor: 'rgba(0,0,0,0)',
+      radialaxis: { 
+        visible: true,
+        gridcolor: '#00ffff33',
+        linecolor: '#00ffff',
+        tickfont: { color: '#00ffff' }
+      },
+      angularaxis: {
+        gridcolor: '#00ffff33',
+        linecolor: '#00ffff',
+        tickfont: { color: '#00ffff' }
+      }
+    },
+    paper_bgcolor: 'rgba(0,0,0,0)',
+    plot_bgcolor: 'rgba(0,0,0,0)',
+    font: { family: 'Orbitron, sans-serif', color: '#e0faff' },
+    legend: {
+      orientation: 'h',
+      x: 0.5, xanchor: 'center',
+      y: -0.2, yanchor: 'top',
+      font: { color: '#00ffff' },
+      bgcolor: 'rgba(0,0,0,0)'
+    },
+    margin: { t: 60, b: 80 }
+  };
+
+  Plotly.newPlot('radar', radarData, radarLayout, {displayModeBar: false, responsive: true});
+</script>
+
+  <script>
+    // ข้อมูลตัวอย่าง
+    var traceSent = { 
+      x: ['Car1','Car2','Car3','Car4','Car5'], 
+      y: [20, 14, 23, 25, 18], 
+      name: 'Sent', 
+      type: 'bar',
+      marker: { color: '#00eaff', line: { width: 1.5, color: '#00ffff' } }
+    };
+
+    var traceHold = { 
+      x: ['Car1','Car2','Car3','Car4','Car5'], 
+      y: [12, 18, 29, 17, 22], 
+      name: 'Hold', 
+      type: 'bar',
+      marker: { color: '#007bff', line: { width: 1.5, color: '#00ffff' } }
+    };
+
+    var data = [traceSent, traceHold];
+
+    var layout = { 
+      barmode: 'stack',
+      title: {
+        text: 'Logistics Status',
+        font: { family: 'Orbitron, sans-serif', size: 22, color: '#00ffff' }
+      },
+      paper_bgcolor: 'rgba(0,0,0,0)',
+      plot_bgcolor: 'rgba(0,0,0,0)',
+      font: { family: 'Orbitron, sans-serif', color: '#e0faff' },
+      xaxis: {
+        title: { text: 'Vehicles', font: { color: '#00ffff' } },
+        tickfont: { color: '#00ffff' },
+        gridcolor: '#00ffff33',
+        zeroline: false
+      },
+      yaxis: {
+        title: { text: 'Orders', font: { color: '#00ffff' } },
+        tickfont: { color: '#00ffff' },
+        gridcolor: '#00ffff33',
+        zeroline: false
+      },
+      legend: {
+        orientation: 'h',
+        x: 0.5, xanchor: 'center',
+        y: -0.2, yanchor: 'top',
+        font: { color: '#00ffff' },
+        bgcolor: 'rgba(0,0,0,0)'
+      },
+      margin: { l: 70, r: 30, t: 60, b: 80 }
+    };
+
+    Plotly.newPlot('stackedBar', data, layout, {displayModeBar: false, responsive: true});
+  </script>
+
+<script>
+  // เรียกใช้งาน: renderSolarHalo('solarHalo', powerArray[24]);
+  // ถ้าไม่ส่ง powerArray จะใช้ตัวอย่างข้อมูลอัตโนมัติ
+  function renderSolarHalo(containerId, powerArray) {
+    const hours = [...Array(24)].map((_, i) => i); // 0..23
+
+    // ตัวอย่างโค้งกำลังผลิต (พาราโบลา พีคช่วงเที่ยง)
+    const sample = hours.map(h => {
+      const x = (h - 12) / 6;
+      const base = Math.max(0, 1 - x * x);
+      return Math.round(base * 1000); // W
+    });
+
+    const power = Array.isArray(powerArray) && powerArray.length === 24 ? powerArray : sample;
+
+    const trace = {
+      type: 'scatterpolar',
+      r: power,
+      theta: hours.map(h => `${h}:00`),
+      fill: 'toself',
+      mode: 'lines',
+      line: { color: '#00eaff', width: 3 },
+      fillcolor: 'rgba(0,255,255,0.25)',
+      name: 'Power'
+    };
+
+    const layout = {
+      paper_bgcolor: 'rgba(0,0,0,0)',
+      font: { family: 'Orbitron, sans-serif', color: '#e0faff' },
+      polar: {
+        bgcolor: 'rgba(0,0,0,0)',
+        radialaxis: { gridcolor: '#00ffff33', tickfont: { color: '#00ffff' } },
+        angularaxis:{ gridcolor: '#00ffff33', tickfont: { color: '#00ffff' } }
+      },
+      legend: {
+        orientation: 'h', x: 0.5, xanchor: 'center', y: -0.2,
+        bgcolor: 'rgba(0,0,0,0)', font: { color: '#00ffff' }
+      },
+      margin: { t: 10, b: 60, l: 10, r: 10 }
+    };
+
+    Plotly.newPlot(containerId, [trace], layout, { displayModeBar:false, responsive:true });
+  }
+
+  // ▶ ตัวอย่างการเรียก (ลบ/แก้ได้ตามจริง)
+  renderSolarHalo('solarHalo');
+</script>
+
+<script>
+  // เรียกใช้งาน: renderSolarCalendar('solarCal', 30, dailyArray);
+  // dailyArray = อาร์เรย์ค่าพลังงานรายวันยาวเท่าจำนวนวัน (เช่น 30 ค่า) หน่วย kWh/วัน
+  // ถ้าไม่ส่ง dailyArray จะใช้ตัวอย่างข้อมูลอัตโนมัติ
+  function renderSolarCalendar(containerId, daysInMonth, dailyArray) {
+    const days = Array.from({ length: daysInMonth }, (_, i) => i + 1);
+    const weeks = Math.ceil(daysInMonth / 7);
+    const weekLabels = Array.from({ length: weeks }, (_, i) => `Week ${i + 1}`);
+
+    // เตรียมเมทริกซ์ weeks x 7
+    const grid = Array.from({ length: weeks }, () => Array(7).fill(null));
+
+    // ตัวอย่างข้อมูล: สูงช่วงกลางเดือน
+    const sample = days.map(d => Math.round(30 + 20 * Math.sin((d / daysInMonth) * Math.PI)));
+    const data = Array.isArray(dailyArray) && dailyArray.length === daysInMonth ? dailyArray : sample;
+
+    days.forEach((d, i) => {
+      const w = Math.floor(i / 7); // สัปดาห์
+      const c = i % 7;             // วัน 0..6 (Mon..Sun)
+      if (w < grid.length) grid[w][c] = data[i];
+    });
+
+    const heat = {
+      z: grid,
+      x: ['Mon','Tue','Wed','Thu','Fri','Sat','Sun'],
+      y: weekLabels,
+      type: 'heatmap',
+      hoverongaps: false,
+      colorscale: [
+        [0,   'rgba(0,40,80,1)'],
+        [0.3, 'rgba(0,120,180,1)'],
+        [0.6, 'rgba(0,200,255,1)'],
+        [1,   'rgba(0,255,255,1)']
+      ],
+      colorbar: { tickfont: { color: '#00ffff' }, title: { text: 'kWh/day', side: 'right', font: { color: '#00ffff' } } }
+    };
+
+    const layout = {
+      paper_bgcolor: 'rgba(0,0,0,0)',
+      plot_bgcolor: 'rgba(0,0,0,0)',
+      font: { family: 'Orbitron, sans-serif', color: '#e0faff' },
+      xaxis: { tickfont: { color: '#00ffff' }, gridcolor: '#00ffff33' },
+      yaxis: { tickfont: { color: '#00ffff' }, gridcolor: '#00ffff33' },
+      margin: { l: 60, r: 20, t: 10, b: 40 }
+    };
+
+    Plotly.newPlot(containerId, [heat], layout, { displayModeBar:false, responsive:true });
+  }
+
+  // ▶ ตัวอย่างการเรียก (ลบ/แก้ได้ตามจริง)
+  renderSolarCalendar('solarCal', 30);
+</script>
+
+<script>
+const parameters = {
+  CCTV: ["Offline","Online","Intruder","Total"],
+  Electrical: ["Voltage","Current","Power","Frequency"],
+  Water: ["Flow Rate","Water Usage","Duration (Months)","Duration (Days)"],
+  Air: ["Temperature","Humidity","PM2.5","PM10","CO2","TVOC","CH2O"]
+};
+
+const floors = ["1st_Floor","M_Floor","2nd_Floor","3rd_Floor","4th_Floor","5th_Floor"];
+const neonPalette = ["#00FFFF", "#7DF9FF", "#8A2BE2", "#FF00FF", "#00FF7F", "#FF1493", "#1E90FF", "#00CED1"];
+const pointsPerTrace = 72; // ขยายแกน X 3 เท่า
+const xAxisValues = [...Array(pointsPerTrace).keys()];
+
+// สร้างข้อมูลสุ่ม realistic
+function generateData(param) {
+  const base = {
+    "Offline":[0,5], "Online":[5,20], "Intruder":[0,2], "Total":[5,20],
+    "Voltage":[210,230], "Current":[1,30], "Power":[0.5,10], "Frequency":[49,51],
+    "Flow Rate":[0,1], "Water Usage":[10,100], "Duration (Months)":[1,12], "Duration (Days)":[1,30],
+    "Temperature":[22,28], "Humidity":[40,60], "PM2.5":[5,25], "PM10":[10,50],
+    "CO2":[400,800], "TVOC":[0,1], "CH2O":[0,0.1]
+  };
+  const [min,max] = base[param] || [0,50];
+  return Array.from({length:pointsPerTrace}, ()=> +(Math.random()*(max-min)+min).toFixed(2));
+}
+
+// สร้าง traces 3D
+let data3D = [];
+floors.forEach(floor=>{
+  Object.keys(parameters).forEach(system=>{
+    parameters[system].forEach((param,i)=>{
+      const color = neonPalette[i % neonPalette.length];
+      data3D.push({
+        x: xAxisValues,
+        y: Array(pointsPerTrace).fill(floor),
+        z: generateData(param),
+        mode: 'lines',
+        type: 'scatter3d',
+        name: `${floor} - ${param} - ${system}`,
+        line: {width:3, color:color},
+        visible: true
+      });
+    });
+  });
+});
+
+// Layout 3D โปร่งใส
+const layout3D = {
+  paper_bgcolor:'rgba(0,0,0,0)',
+  plot_bgcolor:'rgba(0,0,0,0)',
+  showlegend:false,
+  scene:{
+    xaxis:{title:'Hour', gridcolor:'rgba(0,255,255,0.2)', backgroundcolor:'rgba(0,0,0,0)'},
+    yaxis:{title:'Floor', tickvals:[...Array(floors.length).keys()], ticktext:floors, gridcolor:'rgba(0,255,255,0.2)', backgroundcolor:'rgba(0,0,0,0)'},
+    zaxis:{title:'Value', gridcolor:'rgba(0,255,255,0.2)', backgroundcolor:'rgba(0,0,0,0)'},
+    camera:{eye:{x:1.25,y:1.5,z:1}}
+  },
+  margin:{l:0,r:0,b:0,t:0},
+  legend:{orientation:'h', x:0.5, xanchor:'center', y:-0.2, font:{color:'#0ff'}, bgcolor:'rgba(0,0,0,0)'}
+};
+
+Plotly.newPlot('dashboard3D', data3D, layout3D, {responsive:true, displayModeBar:true});
+
+// Legend toggle
+let legendVisible = false;
+document.getElementById('legendToggle3D').addEventListener('click', ()=>{
+  legendVisible = !legendVisible;
+  document.getElementById('legendToggle3D').innerText = legendVisible ? 'Hide Legend' : 'Show Legend';
+  Plotly.relayout('dashboard3D', {showlegend:legendVisible});
+});
+
+// Update paramSelect
+const systemSelect = document.getElementById('systemSelect3D');
+const paramSelect = document.getElementById('paramSelect3D');
+const floorSelect = document.getElementById('floorSelect3D');
+
+systemSelect.addEventListener('change', ()=>{
+  const sys = systemSelect.value;
+  paramSelect.innerHTML = '<option value="ALL">All Parameters</option>';
+  if(parameters[sys]) parameters[sys].forEach(p=> paramSelect.innerHTML += `<option value="${p}">${p}</option>`);
+  updateVisibility3D();
+});
+
+floorSelect.addEventListener('change', updateVisibility3D);
+paramSelect.addEventListener('change', updateVisibility3D);
+
+function updateVisibility3D(){
+  const selFloor = floorSelect.value;
+  const selSys = systemSelect.value;
+  const selParam = paramSelect.value;
+
+  data3D.forEach(trace=>{
+    const [floor,param,system] = trace.name.split(' - ');
+    trace.visible = (selFloor==='ALL'||floor===selFloor) &&
+                    (selSys==='ALL'||system===selSys) &&
+                    (selParam==='ALL'||param===selParam);
+  });
+
+  Plotly.react('dashboard3D', data3D, layout3D, {responsive:true, displayModeBar:true});
+}
+</script>
+
+<script>
+    const floors4D = ["1st_Floor","M_Floor","2nd_Floor","3rd_Floor","4th_Floor","5th_Floor"];
+    const hours4D = [...Array(24).keys()];
+    const params4D = ["CO2","Temperature","Humidity","PM2.5"];
+    const neonColors4D = ["#00FFFF","#7DF9FF","#8A2BE2","#FF00FF","#00FF7F","#FF1493","#1E90FF","#00CED1"];
+
+    function generate4DData(param){
+      const data=[];
+      floors4D.forEach((floor,fIndex)=>{
+        hours4D.forEach(hour=>{
+          const value = +(Math.random() * (param==="CO2"?40: param==="Temperature"?28: param==="Humidity"?60:25) + (param==="CO2"?400: param==="Temperature"?22: param==="Humidity"?40:5)).toFixed(1);
+          data.push({x:hour,y:fIndex,z:value,size:value/10+1,color:value,floor:floor,hour:hour,param:param});
+        });
+      });
+      return data;
+    }
+
+    let currentParam4D = "CO2";
+    let rawData4D = generate4DData(currentParam4D);
+
+    function createTrace4D(param){
+      const filtered = rawData4D.filter(d=>d.param===param);
+      return {
+        x: filtered.map(d=>d.x),
+        y: filtered.map(d=>d.y),
+        z: filtered.map(d=>d.z),
+        mode:'markers',
+        type:'scatter3d',
+        marker:{
+          size: filtered.map(d=>d.size),
+          color: filtered.map((d,i)=>neonColors4D[i%neonColors4D.length]),
+          opacity:0.8,
+          line:{width:2,color:'#0ff'},
+          colorbar:{title:param,tickfont:{color:'#0ff'}}
+        },
+        text: filtered.map(d=>`${d.floor} - Hour ${d.hour} - ${param}: ${d.z}`),
+        hoverinfo:'text'
+      };
+    }
+
+    const trace4D = createTrace4D(currentParam4D);
+
+    const layout4D = {
+      paper_bgcolor:'rgba(0,0,0,0)',
+      plot_bgcolor:'rgba(0,0,0,0)',
+      scene:{
+        xaxis:{title:'Hour', gridcolor:'rgba(0,255,255,0.2)'},
+        yaxis:{title:'Floor', tickvals:floors4D.map((_,i)=>i), ticktext:floors4D, gridcolor:'rgba(0,255,255,0.2)'},
+        zaxis:{title:'Value', gridcolor:'rgba(0,255,255,0.2)'},
+        camera:{eye:{x:1.5,y:2,z:1.5}}
+      },
+      margin:{l:0,r:0,b:0,t:0},
+      showlegend:false
+    };
+
+    Plotly.newPlot('dashboard4D',[trace4D],layout4D,{responsive:true,displayModeBar:true});
+
+    const paramSelect4D = document.getElementById('paramSelect4D');
+    const floorSelect4D = document.getElementById('floorSelect4D');
+
+    paramSelect4D.addEventListener('change', e=>{
+      currentParam4D = e.target.value;
+      rawData4D = generate4DData(currentParam4D);
+      Plotly.react('dashboard4D',[createTrace4D(currentParam4D)],layout4D,{responsive:true,displayModeBar:true});
+    });
+
+    floorSelect4D.addEventListener('change', e=>{
+      const floor = e.target.value;
+      let filteredData = rawData4D;
+      if(floor!=="ALL") filteredData = rawData4D.filter(d=>d.floor===floor);
+      Plotly.react('dashboard4D',[{
+        x: filteredData.map(d=>d.x),
+        y: filteredData.map(d=>d.y),
+        z: filteredData.map(d=>d.z),
+        mode:'markers',
+        type:'scatter3d',
+        marker:{
+          size: filteredData.map(d=>d.size),
+          color: filteredData.map((d,i)=>neonColors4D[i%neonColors4D.length]),
+          opacity:0.8,
+          line:{width:2,color:'#0ff'}
+        },
+        text: filteredData.map(d=>`${d.floor} - Hour ${d.hour} - ${d.param}: ${d.z}`),
+        hoverinfo:'text'
+      }],layout4D,{responsive:true,displayModeBar:true});
+    });
+  </script>
+  
+  <script>
+    /* เพิ่ม sheen เข้าไปใน card */
+    document.querySelectorAll('.floor-card').forEach(c=>{
+      const s = document.createElement('i');
+      s.className = 'sheen';
+      c.appendChild(s);
+    });
+  </script>
+  
+
+<script>
+  // === ปุ่มเลือกชั้น (รวม Home) =======================================
+  const floorButtonsContainerId = 'floorButtons';
+
+  // ป้ายชื่อสวย ๆ สำหรับปุ่มแต่ละชั้น
+  const LABELS = {
+    'HOME':        'BPS',
+    '1st_Floor':   '1F',
+    'M_Floor':     'M',
+    '2nd_Floor':   '2F',
+    '3rd_Floor':   '3F',
+    '4th_Floor':   '4F',
+    'Roof_Level':  '5F'
+  };
+
+  // สร้าง spec ของปุ่ม: Home + แต่ละชั้นตาม ANNO_TO_MODEL (ลำดับอิงการประกาศ)
+  const FLOOR_BTNS = [
+    { key: 'HOME', uid: MODEL_START, label: LABELS['HOME'] },
+    ...Object.entries(ANNO_TO_MODEL).map(([k, uid]) => ({
+      key: k, uid, label: LABELS[k] || k.replace(/_/g,' ')
+    }))
+  ];
+
+  // กัน push ประวัติตอนกลับ Home (ถ้ามีธงจากโค้ดเดิมจะใช้ด้วย)
+  let _localSuppress = false;
+
+  function renderFloorButtons(){
+    const container = document.getElementById(floorButtonsContainerId);
+    if (!container) return;
+
+    container.innerHTML = '';
+    FLOOR_BTNS.forEach(spec => {
+      const btn = document.createElement('button');
+      btn.textContent = spec.label;
+      btn.dataset.uid = spec.uid;
+      btn.title = `Go to ${spec.label}`;
+      btn.addEventListener('click', () => {
+        if (spec.uid === MODEL_START) {
+          // กลับ Home: เคลียร์สแต็ค Back และไม่ push ประวัติปัจจุบัน
+          try { if (typeof historyStack !== 'undefined') historyStack.length = 0; } catch(e){}
+          // ใช้ธง suppress ของระบบเดิมถ้ามี ไม่งั้นใช้โลคอล
+          const hasGlobalSuppress = (typeof suppressHistoryPush !== 'undefined');
+          if (hasGlobalSuppress) suppressHistoryPush = true; else _localSuppress = true;
+          hideAll();
+          initModel(MODEL_START);
+          if (hasGlobalSuppress) suppressHistoryPush = false; else _localSuppress = false;
+        } else {
+          hideAll();
+          initModel(spec.uid);
+        }
+      });
+      container.appendChild(btn);
+    });
+  }
+
+  // ไฮไลต์ปุ่มของโมเดลที่กำลังเปิดอยู่
+  function highlightFloor(uid){
+    const selector = `#${floorButtonsContainerId} button`;
+    document.querySelectorAll(selector).forEach(b => {
+      b.classList.toggle('highlight', b.dataset.uid === uid);
+    });
+  }
+
+  // --- ผูกเข้ากับ initModel เดิมให้ไฮไลต์อัปเดตอัตโนมัติ ---
+  // ถ้าอยากแทรกแบบไม่แก้ initModel มาก ให้สอดบรรทัด highlight ไว้ตอนท้ายของ initModel ด้วยก็ได้
+  // แต่ถ้าไม่สะดวกแก้ในนั้น เราจะ hook แบบนี้:
+  (function patchInitHighlight(){
+    const _init = initModel;
+    window.initModel = function(uid){
+      // ถ้าเราใช้ suppress ชั่วคราวเอง ให้เลียนแบบ suppressHistoryPush = true
+      if (_localSuppress && typeof suppressHistoryPush === 'undefined') {
+        // ดักไว้เฉย ๆ ไม่ต้องทำอะไร เพราะเราเคลียร์ stack ไปก่อนแล้ว
+      }
+      const ret = _init(uid);
+      // หลังสลับโมเดลแล้ว ให้ไฮไลต์ปุ่ม
+      try { highlightFloor(uid); } catch(e){}
+      return ret;
+    };
+  })();
+
+  // เรียกครั้งแรก
+  renderFloorButtons();
+  // ไฮไลต์ Home ตอนเริ่ม
+  highlightFloor(MODEL_START);
+</script>
+
+<script>
+  // === Floor buttons (Home + Floors) =================================
+  const LABELS = {
+    'HOME':        'BPS',
+    '1st_Floor':   '1F',
+    'M_Floor':     'M',
+    '2nd_Floor':   '2F',
+    '3rd_Floor':   '3F',
+    '4th_Floor':   '4F',
+    'Roof_Level':  '5F'
+  };
+
+  const FLOOR_BTNS = [
+    { key: 'HOME', uid: MODEL_START, label: LABELS['HOME'] },
+    ...Object.entries(ANNO_TO_MODEL).map(([k, uid]) => ({
+      key: k, uid, label: LABELS[k] || k.replace(/_/g,' ')
+    }))
+  ];
+
+  function renderFloorButtons(){
+    const container = document.getElementById('floorButtons');
+    if (!container) return;
+    container.innerHTML = '';
+    FLOOR_BTNS.forEach(spec => {
+      const b = document.createElement('button');
+      b.className = 'chip';
+      b.textContent = spec.label;
+      b.dataset.uid = spec.uid;
+      b.title = `Go to ${spec.label}`;
+      b.addEventListener('click', () => {
+        if (spec.uid === MODEL_START){
+          // กลับบ้านแบบเคลียร์สแต็ค
+          if (typeof historyStack !== 'undefined') historyStack.length = 0;
+          if (typeof suppressHistoryPush !== 'undefined'){ suppressHistoryPush = true; }
+          hideAll();             // ซ่อนการ์ดก่อน
+          initModel(MODEL_START);
+          if (typeof suppressHistoryPush !== 'undefined'){ suppressHistoryPush = false; }
+        } else {
+          hideAll();             // ซ่อนการ์ดก่อนเข้าโมเดลใหม่ทุกครั้ง
+          initModel(spec.uid);
+        }
+      });
+      container.appendChild(b);
+    });
+  }
+
+  function highlightFloor(uid){
+    document.querySelectorAll('#floorButtons .chip').forEach(ch => {
+      ch.classList.toggle('active', ch.dataset.uid === uid);
+    });
+  }
+
+  // hook ให้ไฮไลต์อัปเดตทุกครั้งที่เปลี่ยนโมเดล
+  (function patchInitForHighlight(){
+    const _init = initModel;
+    window.initModel = function(uid){
+      const r = _init(uid);
+      try { highlightFloor(uid); } catch(e){}
+      return r;
+    };
+  })();
+
+  // เรียกครั้งแรก
+  renderFloorButtons();
+  highlightFloor(MODEL_START);
+</script>
+
+
+<script>
+/* ================= CCTV MAP WIDGET ==================== */
+/* API: 
+   - renderCCTVMap({mapUrl, cameras})
+   - setActiveCamera(id)
+   - clearCCTVMap()
+   cameras = [{ id, x, y, active, label?, ip?, ch?, cov? }]
+*/
+(function(){
+  const el = document.getElementById('cctvMap');
+  if(!el) return;
+
+  const mapEl   = document.createElement('div'); mapEl.className = 'map';
+  const layerEl = document.createElement('div'); layerEl.className = 'layer';
+  el.appendChild(mapEl); el.appendChild(layerEl);
+
+  function clearCCTVMap(){ layerEl.innerHTML=''; }
+  function setMap(url){ mapEl.style.backgroundImage = `url('${url}')`; }
+
+  function createPin(c){
+    const wrap = document.createElement('div');
+    wrap.className = 'pin';
+    wrap.style.position='absolute';
+    wrap.style.left = c.x + '%';
+    wrap.style.top  = c.y + '%';
+
+    // coverage (ถ้าอยากซ่อน: คอมเมนต์บรรทัดนี้)
+    const cov = document.createElement('div');
+    cov.className = 'coverage'; 
+    if(c.cov) { cov.style.width = cov.style.height = c.cov+'px'; }
+    wrap.appendChild(cov);
+
+    const cam = document.createElement('div');
+    cam.className = 'cam' + (c.active ? ' active':'');
+    cam.dataset.id = c.id || '';
+    wrap.appendChild(cam);
+
+    const tip = document.createElement('div');
+    tip.className = 'tip';
+    tip.innerHTML = (c.label || c.id || '') + (c.ch ? ` • ${c.ch}` : '') + (c.ip ? `<div style="opacity:.8">IP: ${c.ip}</div>`:'');
+    wrap.appendChild(tip);
+
+    return wrap;
+  }
+
+  function renderCCTVMap({mapUrl, cameras}){
+    setMap(mapUrl || '');
+    clearCCTVMap();
+    (cameras || []).forEach(c => layerEl.appendChild(createPin(c)));
+  }
+
+  function setActiveCamera(id){
+    layerEl.querySelectorAll('.cam').forEach(dot=>{
+      dot.classList.toggle('active', dot.dataset.id === String(id));
+    });
+  }
+
+  // expose
+  window.CCTVMapWidget = { renderCCTVMap, setActiveCamera, clearCCTVMap };
+})();
+</script>
+
+<script>
+/* === ดึงกล้องจากชีตตามชั้น แล้ววาดลง #cctvMap ===================
+   สมมติคอลัมน์:
+   0 = Floor/Key, 2 = ImageURL(ตัวอย่าง), 23 = CameraName, 
+   25 = FloorMapURL, 26 = x(%), 27 = y(%)
+===================================================================== */
+function renderFloorMapFromSheet(floorKey, activeName){
+  const sheetID   = "1pG8ldAgtHsOzlVxjITuBp2XCS77Sdk15fvmR-YU-MDg";
+  const sheetName = "Data_EachFloor";
+  const url = `https://docs.google.com/spreadsheets/d/${sheetID}/gviz/tq?tqx=out:json&sheet=${encodeURIComponent(sheetName)}`;
+
+  fetch(url)
+    .then(r => r.text())
+    .then(t => {
+      const data = JSON.parse(t.substr(47).slice(0,-2));
+      const rows = data.table.rows;
+
+      // เลือกเฉพาะแถวที่คอลัมน์ 0 == floorKey
+      const sameFloor = rows
+        .map(r => r.c)
+        .filter(c => (c[0] && c[0].v === floorKey));
+
+      if(sameFloor.length === 0){
+        // เคลียร์แผนที่ถ้าไม่มีข้อมูล
+        window.CCTVMapWidget?.clearCCTVMap?.();
+        return;
+      }
+
+      // รูปแปลนของชั้น (เอาจากแถวแรกคอลัมน์ 25 ถ้ามี)
+      const mapUrl = sameFloor[0][25]?.v || "";
+
+      // สร้างกล้องจากคอลัมน์ 26,27 (x,y), 23 (label), 2 (img ของกล้อง), etc.
+      const cameras = sameFloor.map(c => {
+        const idOrLabel = (c[23]?.v || '').trim();   // ชื่อกล้อง
+        const x = parseFloat(c[26]?.v);              // %
+        const y = parseFloat(c[27]?.v);              // %
+        return {
+          id: idOrLabel || (c[0]?.v || ''),          // ใช้ชื่อกล้องเป็น id
+          label: idOrLabel,
+          x: Number.isFinite(x) ? x : 0,
+          y: Number.isFinite(y) ? y : 0,
+          active: (idOrLabel && activeName && idOrLabel.toLowerCase() === String(activeName).toLowerCase()),
+          ch: c[1]?.v || "",                         // หากต้องการโชว์เวลา/หมายเหตุ
+          ip: c[22]?.v || "",                        // *ปรับได้ตามชีตจริงถ้ามี IP
+          cov: 140                                   // ปรับขนาด coverage ได้
+        };
+      });
+
+      // วาดลงวิดเจ็ต
+      window.CCTVMapWidget?.renderCCTVMap({ mapUrl, cameras });
+    })
+    .catch(err => console.error('CCTV Map load error:', err));
+}
+</script>
+
+<script>
+async function checkAlarmAndFocus() {
+  const sheetID   = "1pG8ldAgtHsOzlVxjITuBp2XCS77Sdk15fvmR-YU-MDg";
+  const sheetName = "Data_EachFloor_Alarm";
+  const url = `https://docs.google.com/spreadsheets/d/${sheetID}/gviz/tq?tqx=out:json&sheet=${encodeURIComponent(sheetName)}`;
+
+  try {
+    const res = await fetch(url);
+    const txt = await res.text();
+    const json = JSON.parse(txt.substr(47).slice(0, -2));
+    const rows = json.table.rows;
+
+    // ค่าช่อง A2 (index 0, แถวที่ 1)
+    const alarmValue = rows[1]?.c[0]?.v || "";
+    console.log("Alarm from sheet:", alarmValue);
+
+    if (alarmValue && alarmValue !== "No Alarm" && apiRef) {
+      // หา index ของ annotation ที่ชื่อเท่ากับ alarmValue
+      apiRef.getAnnotationList(function(err, annos){
+        if (err || !annos) return;
+        const idx = annos.findIndex(a => (a.name || a.title) === alarmValue);
+        if (idx >= 0) {
+          console.log("Focusing annotation:", alarmValue, idx);
+          apiRef.gotoAnnotation(idx, {preventCameraAnimation: false});
+        }
+      });
+    }
+  } catch (err) {
+    console.error("❌ Error reading alarm sheet:", err);
+  }
+}
+
+// เรียกครั้งแรก และทำซ้ำทุก 10 วินาที
+setInterval(checkAlarmAndFocus, 10000);
+checkAlarmAndFocus();
+</script>
+
+<script>
+/* ===== Mini Layer Chips (ซ้ายบรรทัดเดียวกับ NumberFloor) ===== */
+(function(){
+  // ป้ายสั้น ๆ บนชิป
+  const LABELS = {
+    'HOME':       'BPS',
+    '1st_Floor':  '1F',
+    'M_Floor':    'M',
+    '2nd_Floor':  '2F',
+    '3rd_Floor':  '3F',
+    '4th_Floor':  '4F',
+    'Roof_Level': '5F'
+  };
+
+  // รายการปุ่ม: HOME + แต่ละชั้น (อิง ANNO_TO_MODEL เดิม)
+  const MINI_BTNS = [
+    { key:'HOME', uid: (typeof MODEL_START!=='undefined'?MODEL_START:null), label: LABELS['HOME'], kind:'building' },
+    ...Object.entries(typeof ANNO_TO_MODEL!=='undefined'?ANNO_TO_MODEL:{}).map(([k, uid])=>({
+      key:k, uid, label: LABELS[k] || k.replace(/_/g,' '), kind:'floor'
+    }))
+  ];
+
+  const box = document.getElementById('miniChips');
+  if(!box) return;
+
+  // สร้างปุ่ม
+  MINI_BTNS.forEach(spec=>{
+    const b = document.createElement('button');
+    b.className = 'mini-chip' + (spec.kind==='building' ? ' building' : '');
+    b.textContent = spec.label;
+    b.dataset.key = spec.key;
+    b.dataset.uid = spec.uid || '';
+    b.title = (spec.kind==='building'?'All (BPS)':'Go to ' + spec.label);
+    b.addEventListener('click', ()=>{
+      // กด BPS = กลับโมเดลรวม
+      if(spec.key==='HOME' && window.initModel && typeof MODEL_START!=='undefined'){
+        try{ if(typeof historyStack!=='undefined') historyStack.length = 0; }catch(e){}
+        if(typeof suppressHistoryPush!=='undefined') suppressHistoryPush = true;
+        hideAll?.();                // ซ่อนการ์ดก่อน (ฟังก์ชันเดิมของคุณ)
+        initModel(MODEL_START);     // เรียกของเดิม
+        if(typeof suppressHistoryPush!=='undefined') suppressHistoryPush = false;
+        setActiveChip('HOME');
+      }else if(spec.uid){
+        hideAll?.();
+        initModel(spec.uid);
+        setActiveChip(spec.key);
+      }
+    });
+    box.appendChild(b);
+  });
+
+  function setActiveChip(keyOrUid){
+    // รับได้ทั้ง key ('1st_Floor') หรือ uid ของโมเดล
+    const byKey = !!document.querySelector(`.mini-chip[data-key="${keyOrUid}"]`);
+    document.querySelectorAll('#miniChips .mini-chip').forEach(btn=>{
+      const on = byKey ? (btn.dataset.key===keyOrUid) : (btn.dataset.uid===keyOrUid);
+      btn.classList.toggle('active', on);
+      btn.setAttribute('aria-pressed', on ? 'true' : 'false');
+    });
+  }
+
+  // ไฮไลต์เริ่มต้นที่ HOME
+  setActiveChip('HOME');
+
+  // hook ซิงก์ไฮไลต์ทุกครั้งที่ initModel ถูกเรียกที่อื่น
+  (function patchInitForMiniChips(){
+    if(!window.initModel) return; // รอให้มีฟังก์ชันจริงก่อน
+    const _init = window.initModel;
+    window.initModel = function(uid){
+      const r = _init(uid);
+      try{
+        // โยง uid → key (เพื่อให้ชิปถูกตัวเสมอ)
+        const hit = MINI_BTNS.find(b=>b.uid===uid);
+        setActiveChip(hit ? hit.key : uid);
+      }catch(e){}
+      return r;
+    };
+  })();
+})();
+</script>
+
+<script>
+/* ===== Neon Elevator (mini) — build & wire ===== */
+(function(){
+  // map key ←→ uid + label
+  const LABELS = {
+    'HOME'      : 'BPS',
+    '1st_Floor' : '1F',
+    'M_Floor'   : 'M',
+    '2nd_Floor' : '2F',
+    '3rd_Floor' : '3F',
+    '4th_Floor' : '4F',
+    'Roof_Level': '5F'
+  };
+
+  // ลำดับชั้นล่าง→บน (ตามที่คุณใช้ใน 3D)
+  const FLOORS = ['1st_Floor','M_Floor','2nd_Floor','3rd_Floor','4th_Floor','Roof_Level'];
+
+  const iso   = document.getElementById('isoMini');
+  const stack = document.getElementById('stackMini');
+  if(!iso || !stack) return;
+
+  // ----- สร้างชั้น (bottom → top) -----
+  FLOORS.forEach((key, i) => {
+    const layer = document.createElement('div');
+    layer.className = 'layer-mini';
+    layer.style.setProperty('--z', i);
+    layer.style.setProperty('--delay', (i*0.08)+'s');
+    layer.dataset.key = key;
+    layer.setAttribute('data-label', LABELS[key] || key);
+
+    const bar = document.createElement('div'); bar.className = 'bar-mini';
+    layer.appendChild(bar);
+
+    const hit = document.createElement('div');
+    hit.className = 'hit'; hit.setAttribute('role','button');
+    hit.setAttribute('tabindex','0');
+    hit.setAttribute('aria-label', 'เลือกชั้น '+(LABELS[key]||key));
+    hit.addEventListener('click', ()=> selectFloorMini(key));
+    hit.addEventListener('keydown', e=>{ if(e.key==='Enter'||e.key===' '){ e.preventDefault(); selectFloorMini(key); }});
+    layer.appendChild(hit);
+
+    stack.appendChild(layer);
+  });
+
+  // ----- โหมด BPS = ไฮไลต์ทุกชั้น -----
+  function selectAllMini(){
+    // เปิด effect ทุกชั้น
+    stack.classList.add('all-mode');
+    [...stack.querySelectorAll('.layer-mini')].forEach(l=>l.classList.add('active'));
+    // ไปโมเดลรวม
+    if(typeof MODEL_START!=='undefined' && typeof initModel==='function'){
+      try{ if(typeof historyStack!=='undefined') historyStack.length = 0; }catch(e){}
+      if(typeof suppressHistoryPush!=='undefined') suppressHistoryPush = true;
+      hideAll?.();
+      initModel(MODEL_START);
+      if(typeof suppressHistoryPush!=='undefined') suppressHistoryPush = false;
+    }
+    // อัปเดต label ปีกซ้าย/ขวา (ถ้าอยาก)
+    const label = document.getElementById('BuildorFloor'); if(label) label.textContent = 'BUILDING';
+  }
+
+  // ----- เลือกชั้นเดียว -----
+  function selectFloorMini(key){
+    stack.classList.remove('all-mode');
+    const layers = [...stack.querySelectorAll('.layer-mini')];
+    layers.forEach(l=>l.classList.remove('active'));
+    const target = layers.find(l=>l.dataset.key===key);
+    if(target) target.classList.add('active');
+
+    // ไปโมเดลชั้นนั้น
+    const uid = (typeof ANNO_TO_MODEL!=='undefined') ? ANNO_TO_MODEL[key] : null;
+    if(uid && typeof initModel==='function'){
+      hideAll?.();
+      initModel(uid);
+    }
+
+    // อัปเดต label (เลือกชั้น)
+    const label = document.getElementById('BuildorFloor'); if(label) label.textContent = 'FLOOR';
+
+    // แจ้ง event เผื่อส่วนอื่นต้องฟัง
+    document.dispatchEvent(new CustomEvent('floorchange', { detail:{ key, label: LABELS[key] || key, all:false } }));
+  }
+
+  // ----- ซิงก์จากภายนอก → ไฮไลต์ใน stack นี้ด้วย -----
+  (function hookInitModel(){
+    if(typeof window.initModel!=='function') return;
+    const _init = window.initModel;
+    window.initModel = function(uid){
+      const r = _init(uid);
+      try{
+        // uid → key (ถ้าไม่พบ แปลว่าเป็น Home)
+        const hit = Object.entries(ANNO_TO_MODEL||{}).find(([k,v])=>v===uid);
+        if(!hit){ // Home
+          stack.classList.add('all-mode');
+          [...stack.querySelectorAll('.layer-mini')].forEach(l=>l.classList.add('active'));
+        }else{
+          const key = hit[0];
+          stack.classList.remove('all-mode');
+          const layers = [...stack.querySelectorAll('.layer-mini')];
+          layers.forEach(l=>l.classList.toggle('active', l.dataset.key===key));
+        }
+      }catch(e){}
+      return r;
+    };
+  })();
+
+  // เริ่มต้นให้เป็นโหมด BPS (เหมือนที่คุณตั้งค่า)
+  selectAllMini();
+
+  // ถ้าอยากให้คลิก “ฮาโลรวม” เพื่อกลับ BPS ง่าย ๆ
+  iso.addEventListener('dblclick', selectAllMini);
+
+  // เผื่อเรียกจากที่อื่นได้
+  window.ElevMini = { selectAllMini, selectFloorMini };
+})();
+</script>
+
+<script>
+  function endsWithZero(name){
+    return typeof name === 'string' && name.trim().endsWith('0');
+  }
+</script>
+
+<script>
+  function toggleCctvDD(e){
+    e.stopPropagation();
+    const dd = document.getElementById('cctvDropdown');
+    dd.classList.toggle('open');
+  }
+  // ปิด dropdown เมื่อคลิกนอก
+  document.addEventListener('click', () => {
+    document.getElementById('cctvDropdown')?.classList.remove('open');
+  });
+
+  function highlightCctvButton(on){
+    const btn = document.querySelector('#cctvDropdown .dd-toggle');
+    if(!btn) return;
+    btn.classList.toggle('highlight', !!on);
+    // ปิดเมนูหลังเลือก
+    document.getElementById('cctvDropdown')?.classList.remove('open');
+  }
+
+  // เรียกเปิดโมดัลจากเมนูย่อย แล้วทำความสะอาดสถานะเดิม
+  function openCctvItem(targetId){
+    closeAllModals?.();
+    removeButtonHighlights?.();
+    openLogistics(targetId);
+    highlightCctvButton(true);
+  }
+</script>
+
+<script>
+  function toggleDD(e, id){
+    e.stopPropagation();
+    document.querySelectorAll('.dropdown').forEach(d => {
+      if (d.id !== id) d.classList.remove('open');
+    });
+    document.getElementById(id)?.classList.toggle('open');
+  }
+
+  function openDDItem(targetId, ddId){
+    closeAllModals?.();
+    removeButtonHighlights?.();
+    openLogistics(targetId);
+    // ไฮไลต์ปุ่ม และปิดเมนูย่อยหลังเลือก
+    const toggle = document.querySelector(`#${ddId} .dd-toggle`);
+    toggle?.classList.add('highlight');
+    document.getElementById(ddId)?.classList.remove('open');
+  }
+
+  // คลิกนอกเพื่อปิดทุกดรอปดาวน์
+  document.addEventListener('click', () => {
+    document.querySelectorAll('.dropdown').forEach(d => d.classList.remove('open'));
+  });
+</script>
+
+<script>
+/* ==== Utility: ปิดทุกโมดัลแบบรวม (ไม่ต้องลิสต์มือ) ==== */
+function closeAllModals() {
+  document.querySelectorAll('.glass-modal, .glass-modal-cctv')
+    .forEach(el => el.classList.remove('active'));
+}
+
+/* ==== ล้างไฮไลต์ปุ่มทุกหัวข้อ (dd-toggle) และปุ่ม Auto View ==== */
+function clearHighlights() {
+  document.querySelectorAll('.menu-buttons .dd-toggle, .menu-buttons > button')
+    .forEach(btn => btn.classList.remove('highlight'));
+}
+
+/* ==== เปิดโมดัลตาม id และไฮไลต์หัวข้อที่เกี่ยวข้อง ==== */
+function openAndHighlight(modalId) {
+  closeAllModals();
+  document.getElementById(modalId)?.classList.add('active');
+
+  // ล้างไฮไลต์เดิม
+  document.querySelectorAll('.menu-buttons .dd-toggle').forEach(b => b.classList.remove('highlight'));
+
+  // หา group ที่ต้องไฮไลต์จาก modalId
+  const groupId = modalGroupMap[modalId];
+  if (!groupId) return; // บางหน้าอยู่นอกเมนู (เช่น BUILDING_OVERVIEW) ก็ไม่ต้องไฮไลต์หัวข้อ
+
+  // ไฮไลต์ปุ่มหัวข้อ (dd-toggle) ของกรุ๊ปนั้น ๆ
+  const group = document.getElementById(groupId);
+  const toggleBtn = group?.querySelector('.dd-toggle');
+  toggleBtn?.classList.add('highlight');
+
+  // (ออปชัน) เปิดเมนูย่อยเพื่อโชว์ว่ามาจากกรุ๊ปไหน
+  // group?.classList.add('open');
+}
+
+/* ==== Map: หน้าไหนอยู่หัวข้อใด ==== */
+const modalGroupMap = {
+  // CCTV
+  'CCTVSecurity': 'cctvDropdown',
+  'CCTV-HQ': 'cctvDropdown',
+  'CCTV-WH': 'cctvDropdown',
+  'CCTV-UDS': 'cctvDropdown',
+  'Hik-Connect': 'cctvDropdown',
+
+  // Logistics
+  'logisticsCenterModal': 'logisticsDD',
+  'LogisticsCRM': 'logisticsDD',
+
+  // Water
+  'WaterSystem': 'waterDD',
+  'wastewater': 'waterDD',
+
+  // Electrical
+  'ElectricalSystem': 'electricalDD',
+  'SmartIOTMeter': 'electricalDD',
+  'Waston': 'electricalDD',
+
+  // FreshAir
+  'FreshAir': 'freshAirDD',
+  'CoolingTower': 'freshAirDD',
+  'CleanAirSystem': 'freshAirDD',
+
+  // Solar
+  'SolarCell': 'solarDD',
+  'fusionsolar': 'solarDD',
+
+  // Fiber
+  'FiberOptic2': 'fiberDD',
+  'FiberOptic': 'fiberDD',
+
+  // Other
+  'Wellness': 'otherDD',
+  'DataCenter': 'otherDD',
+  'CapsuleHouse': 'otherDD'
+};
+
+/* ==== AutoView: ไล่เปิดทุกหน้าในเมนูด้านบน + หน้าเดี่ยวอื่น ๆ ==== */
+const autoSequence = [
+  // === CCTV
+  'CCTVSecurity', 'CCTV-HQ', 'CCTV-WH', 'CCTV-UDS', 'Hik-Connect',
+  // === Logistics
+  'logisticsCenterModal', 'LogisticsCRM',
+  // === Water
+  'WaterSystem', 'wastewater',
+  // === Electrical
+  'ElectricalSystem', 'SmartIOTMeter', 'Waston',
+  // === FreshAir
+  'FreshAir', 'CoolingTower', 'CleanAirSystem',
+  // === Solar
+  'SolarCell', 'fusionsolar',
+  // === Fiber
+  'FiberOptic2', 'FiberOptic',
+  // === Other
+  'Wellness', 'DataCenter', 'CapsuleHouse',
+  // === Standalone (นอกเมนู)
+  'BUILDING_OVERVIEW', 'OFFICE_MAP', '3D_Digital', '4D_Digital'
+];
+
+let autoViewRunning = false;
+let autoViewTimer = null;
+let autoViewBtn = null;
+let autoIndex = 0;
+const AUTO_DELAY_MS = 6000; // หน้าละ ~6 วิ (ปรับได้)
+
+/* ==== เดินหน้าไปยังหน้า/โมดัลถัดไป ==== */
+function stepAutoView() {
+  if (!autoViewRunning) return;
+
+  if (autoIndex >= autoSequence.length) autoIndex = 0;
+  const id = autoSequence[autoIndex++];
+
+  // เปิดหน้า + ไฮไลต์หัวข้อ
+  openAndHighlight(id);
+
+  // จองคิวถัดไป
+  autoViewTimer = setTimeout(stepAutoView, AUTO_DELAY_MS);
+}
+
+/* ==== ปุ่ม Auto View (สลับเริ่ม/หยุด) ==== */
+function runDemo() {
+  if (!autoViewBtn) {
+    // ปุ่ม Auto View คือปุ่มแรกใน .menu-buttons ที่ไม่ใช่ dd-toggle
+    autoViewBtn = document.querySelector('.menu-buttons > button:not(.dd-toggle)');
+  }
+  if (!autoViewRunning) {
+    autoViewRunning = true;
+    autoIndex = 0;
+    autoViewBtn?.classList.add('highlight');
+    autoViewBtn.innerText = '⏹ Stop';
+    stepAutoView();
+  } else {
+    autoViewRunning = false;
+    clearTimeout(autoViewTimer);
+    autoViewTimer = null;
+    closeAllModals();
+    clearHighlights();
+    autoViewBtn?.classList.remove('highlight');
+    autoViewBtn.innerText = '▶ Auto View';
+  }
+}
+
+/* ==== ให้ปุ่มเมนูย่อยเปิดพร้อมไฮไลต์หัวข้อถูกตัวเสมอ ==== */
+function openDDItem(modalId, groupId) {
+  // ปิดออโต้ถ้ากำลังรันอยู่ เพื่อไม่ให้แย่งคิวกัน
+  if (autoViewRunning) { runDemo(); } // toggle → หยุด
+  closeAllModals();
+  clearHighlights();
+  document.getElementById(modalId)?.classList.add('active');
+  const group = document.getElementById(groupId);
+  group?.querySelector('.dd-toggle')?.classList.add('highlight');
+}
+
+/* ==== (ออปชัน) ปิด dropdown อื่นเมื่อเปิดอันใหม่ ==== */
+function toggleDD(e, id) {
+  e.stopPropagation();
+  document.querySelectorAll('.menu-buttons .dropdown').forEach(dd => {
+    if (dd.id === id) dd.classList.toggle('open');
+    else dd.classList.remove('open');
+  });
+}
+document.addEventListener('click', () => {
+  document.querySelectorAll('.menu-buttons .dropdown').forEach(dd => dd.classList.remove('open'));
+});
+
+/* ==== ของเดิม: CCTV dropdown เฉพาะ (ถ้าเรียกใช้) ==== */
+function toggleCctvDD(e){ toggleDD(e, 'cctvDropdown'); }
+</script>
+
+<script>
+(() => {
+  /* ---------- FIX 1: กัน error จาก id iframe ไม่ตรง ---------- */
+  (function setBackgroundByTimeSafe() {
+    const el = document.getElementById('background-frame') || document.getElementById('skfb-frame');
+    if (!el) return;                       // ไม่มี iframe ก็ข้าม
+    // *** ถ้าใช้ Sketchfab API อยู่แล้ว สามารถคอมเมนต์ท่อนตั้ง src นี้ทิ้งได้ ***
+    // const hour = new Date().getHours();
+    // const src = hour < 8
+    //   ? "https://sketchfab.com/models/65a75a890cfe4b63b1e3c7e41e524e36/embed?autostart=1&annotations_visible=0&annotation_cycle=5"
+    //   : hour < 16
+    //   ? "https://sketchfab.com/models/fd7092ffbe88421dbbf9e19dd36894e9/embed?autostart=1&annotations_visible=0&annotation_cycle=5"
+    //   : "https://sketchfab.com/models/9fe00d65cf0c4dec92cf1c6fb7be9e02/embed?autostart=1&annotations_visible=0&annotation_cycle=5";
+    // if (!el.src) el.src = src;
+  })();
+
+  /* ---------- ตัวช่วยทั่วไป ---------- */
+  const AV_DELAY = 6000;
+  let avTimer = null, avRunning = false, avIndex = 0;
+
+  // ลิสต์ modal ที่มีอยู่จริงในหน้า (เอาตาม id ที่คุณสร้างไว้)
+  const AV_SEQUENCE = [
+    'CCTVSecurity',
+    'CCTV-HQ',
+    'CCTV-WH',
+    'CCTV-UDS',
+    
+    'Hik-Connect',
+    'logisticsCenterModal',
+    'SolarCell',
+    'BUILDING_OVERVIEW',
+    '3D_Digital',
+    '4D_Digital',
+    'Hik-Connect'
+  ];
+
+  function closeAllModalsSafe() {
+    document.querySelectorAll('.glass-modal, .glass-modal-cctv').forEach(m => m.classList.remove('active'));
+  }
+  function clearAllHighlights() {
+    document.querySelectorAll('.menu-buttons .dd-toggle, .menu-buttons > button').forEach(b => b.classList.remove('highlight'));
+  }
+  function openAndHighlight(modalId, groupId) {
+    closeAllModalsSafe();
+    document.getElementById(modalId)?.classList.add('active');
+    clearAllHighlights();
+    if (groupId) {
+      document.getElementById(groupId)?.querySelector('.dd-toggle')?.classList.add('highlight');
+    }
+  }
+
+  /* ---------- FIX 2: เติมฟังก์ชันเมนูย่อยที่หาย ---------- */
+  window.toggleDD = function(e, id) {
+    e.stopPropagation();
+    document.querySelectorAll('.menu-buttons .dropdown').forEach(dd => {
+      dd.classList.toggle('open', dd.id === id ? !dd.classList.contains('open') : false);
+    });
+  };
+  window.toggleCctvDD = function(e){ window.toggleDD(e, 'cctvDropdown'); };
+
+  window.openDDItem = function(modalId, groupId) {
+    if (avRunning) window.runDemo();       // ถ้า Auto กำลังเล่น ให้หยุดก่อน
+    openAndHighlight(modalId, groupId);
+  };
+  window.openCctvItem = function(modalId) { window.openDDItem(modalId, 'cctvDropdown'); };
+
+  // คลิคนอกเมนู → ปิด dropdown
+  document.addEventListener('click', () => {
+    document.querySelectorAll('.menu-buttons .dropdown').forEach(dd => dd.classList.remove('open'));
+  });
+
+  /* ---------- FIX 3: เติม runDemo (Auto View) ---------- */
+  window.runDemo = function() {
+    const btn = document.querySelector('.menu-buttons > button:not(.dd-toggle)');
+    if (!avRunning) {
+      // start
+      avRunning = true;
+      avIndex = 0;
+      btn && (btn.innerText = '⏹ Stop', btn.classList.add('highlight'));
+      step();
+    } else {
+      // stop
+      avRunning = false;
+      clearTimeout(avTimer);
+      avTimer = null;
+      btn && (btn.innerText = '▶ Auto View', btn.classList.remove('highlight'));
+      closeAllModalsSafe();
+      clearAllHighlights();
+    }
+  };
+
+  function step() {
+    if (!avRunning) return;
+    if (avIndex >= AV_SEQUENCE.length) avIndex = 0;
+    const id = AV_SEQUENCE[avIndex++];
+    // map id → group ปุ่มบนหัว (เพื่อไฮไลต์หมวดที่ถูกเปิด)
+    const groupMap = {
+      'logisticsCenterModal':'logisticsDD',
+      'CCTV-WH':'cctvDropdown',
+      'CCTV-UDS':'cctvDropdown',
+      'CCTV-HQ':'cctvDropdown',
+      'SolarCell':'solarDD',
+      'BUILDING_OVERVIEW':null,
+      '3D_Digital':null,
+      '4D_Digital':null,
+      'Hik-Connect':'cctvDropdown'
+    };
+    openAndHighlight(id, groupMap[id] || null);
+    avTimer = setTimeout(step, AV_DELAY);
+  }
+})();
+</script>
+
+<script>
+/* ====== ตัวช่วยพื้นฐาน ====== */
+function closeAllModalsSafe(){
+  document.querySelectorAll('.glass-modal, .glass-modal-cctv')
+    .forEach(m => m.classList.remove('active'));
+}
+function clearAllHighlights(){
+  document.querySelectorAll('.menu-buttons .dd-toggle, .menu-buttons > button')
+    .forEach(b => b.classList.remove('highlight'));
+}
+function openAndHighlight(modalId, groupId){
+  closeAllModalsSafe();
+  const m = document.getElementById(modalId);
+  if (m) m.classList.add('active');
+  clearAllHighlights();
+  if (groupId){
+    const dd = document.getElementById(groupId);
+    dd?.querySelector('.dd-toggle')?.classList.add('highlight');
+  }
+}
+
+/* ====== toggle dropdown ====== */
+function toggleDD(e, id){
+  e.stopPropagation();
+  document.querySelectorAll('.menu-buttons .dropdown').forEach(dd => {
+    dd.classList.toggle('open', dd.id === id ? !dd.classList.contains('open') : false);
+  });
+}
+function toggleCctvDD(e){ toggleDD(e, 'cctvDropdown'); }
+
+// ปิดเมนูเมื่อคลิคนอก
+document.addEventListener('click', () => {
+  document.querySelectorAll('.menu-buttons .dropdown').forEach(dd => dd.classList.remove('open'));
+});
+
+/* ====== ฟังก์ชันเปิดโมดัลจากเมนู ====== */
+// ใช้ในปุ่มย่อยของหมวดทั่วไป
+function openDDItem(modalId, groupId){
+  // ถ้ามีโหมด Auto View กำลังทำงานอยู่และคุณมี runDemo() ให้หยุดก่อน
+  if (typeof runDemo === 'function' && window.avRunning) runDemo();
+  openAndHighlight(modalId, groupId);
+}
+
+// ใช้ในปุ่มย่อยของหมวด CCTV
+function openCctvItem(modalId){
+  openDDItem(modalId, 'cctvDropdown');
+}
+
+/* ====== ลำดับ Auto View และการแม็ปไฮไลต์ ======
+   ดึงมาจากเมนูที่ให้มาครบทุกตัว (เรียงตามกลุ่ม/ลำดับปุ่มในโค้ด) */
+const AV_SEQUENCE = [
+  // Graph
+  'BUILDING_OVERVIEW', '3D_Digital', '4D_Digital',
+  // CCTV
+  'CCTVSecurity', 'CCTV-HQ', 'CCTV-WH', 'CCTV-UDS', 'Hik-Connect',
+  // Electrical
+  'ElectricalSystem', 'SmartIOTMeter', 'Waston',
+  // Water
+  'WaterSystem', 'wastewater',
+  // FreshAir
+  'FreshAir', 'CoolingTower', 'CleanAirSystem',
+  // Logistics
+  'logisticsCenterModal', 'LogisticsCRM',
+  // SolarCell
+  'SolarCell', 'fusionsolar',
+  // Fiber
+  'FiberOptic2', 'FiberOptic',
+  // Other
+  'Wellness', 'DataCenter', 'CapsuleHouse'
+];
+
+// modalId → id ของ dropdown เพื่อไฮไลต์ปุ่มกลุ่มบนหัว
+const groupMap = {
+  // Graph
+  'BUILDING_OVERVIEW'  : null,
+  '3D_Digital'         : null,
+  '4D_Digital'         : null,
+    
+  // CCTV
+  'CCTVSecurity'   : 'cctvDropdown',
+  'CCTV-HQ'        : 'cctvDropdown',
+  'CCTV-WH'        : 'cctvDropdown',
+  'CCTV-UDS'       : 'cctvDropdown',
+  'Hik-Connect'    : 'cctvDropdown',
+
+  // Electrical
+  'ElectricalSystem': 'electricalDD',
+  'SmartIOTMeter'   : 'electricalDD',
+  'Waston'          : 'electricalDD',
+
+  // Water
+  'WaterSystem'     : 'waterDD',
+  'wastewater'      : 'waterDD',
+
+  // FreshAir
+  'FreshAir'        : 'freshAirDD',
+  'CoolingTower'    : 'freshAirDD',
+  'CleanAirSystem'  : 'freshAirDD',
+
+  // Logistics
+  'logisticsCenterModal': 'logisticsDD',
+  'LogisticsCRM'        : 'logisticsDD',
+
+  // SolarCell
+  'SolarCell'       : 'solarDD',
+  'fusionsolar'     : 'solarDD',
+
+  // Fiber
+  'FiberOptic2'     : 'fiberDD',
+  'FiberOptic'      : 'fiberDD',
+
+  // Other
+  'Wellness'        : 'otherDD',
+  'DataCenter'      : 'otherDD',
+  'CapsuleHouse'    : 'otherDD'
+};
+
+/* ====== (ออปชัน) ตัวเดิน Auto View ใช้ AV_SEQUENCE + groupMap ====== */
+let avTimer = null, avIndex = 0; window.avRunning = false;
+function stepAuto(){
+  if (!window.avRunning) return;
+  if (avIndex >= AV_SEQUENCE.length) avIndex = 0;
+  const id = AV_SEQUENCE[avIndex++];
+  openAndHighlight(id, groupMap[id]);
+  avTimer = setTimeout(stepAuto, 6000); // 6 วิ/จอ
+}
+// ปุ่ม ▶ Auto View ในเมนู ใช้ฟังก์ชันนี้
+function runDemo(){
+  const btn = document.querySelector('.menu-buttons > button:not(.dd-toggle)');
+  if (!window.avRunning){
+    window.avRunning = true; avIndex = 0;
+    btn && (btn.innerText = '⏹ Stop', btn.classList.add('highlight'));
+    stepAuto();
+  } else {
+    window.avRunning = false;
+    clearTimeout(avTimer); avTimer = null;
+    btn && (btn.innerText = '▶ Auto View', btn.classList.remove('highlight'));
+    closeAllModalsSafe(); clearAllHighlights();
+  }
+}
+</script>
+
+<script>
+// === ตั้งค่าเวลา ===
+const DISPLAY_MS  = 6000;               // เวลาโชว์แต่ละจอ
+const COOLDOWN_MS = 15 * 60 * 1000;     // พัก 15 นาที
+
+// === ตัวแปรสถานะ ===
+let avTimer = null;
+let avIndex = 0;
+let onCooldown = false;
+window.avRunning = window.avRunning ?? false;
+
+// ถ้ามีตัวแปรเก่าจากสคริปต์เดิม เคลียร์ทิ้ง
+if (window.autoViewTimer) { try { clearTimeout(window.autoViewTimer); } catch(e){} }
+window.autoViewTimer = null;
+
+// ช่วยให้เทียบ id แบบไม่พลาดตัวพิมพ์เล็กใหญ่/เว้นวรรค
+const norm = s => String(s || '').trim().toLowerCase();
+
+// เปิดโมดัลตามกลุ่ม (ใช้ของคุณเดิม)
+function openAndHighlight(id, group){
+  // ปิดทั้งหมดก่อน
+  closeAllModalsSafe?.();
+
+  // เปิดตาม group
+  if (group === 'CCTV')      { openCctvItem?.(id); }
+  else if (group)            { openDDItem?.(id, groupMapReverse[group] || ''); }
+  else                       { openLogistics?.(id); }
+
+  // ไฮไลต์ปุ่ม (ถ้ามี)
+  highlightMenuButton?.(id, group);
+}
+
+// ฟังก์ชันหลักของลูป
+function stepAuto(){
+  // ถ้ากำลังพัก ก็ไม่ทำอะไร
+  if (!window.avRunning || onCooldown) return;
+
+  // safety: กัน index เกิน
+  if (avIndex >= AV_SEQUENCE.length) avIndex = 0;
+
+  const id    = AV_SEQUENCE[avIndex++];
+  const group = groupMap[id];
+
+  // เปิดหน้าปัจจุบัน
+  openAndHighlight(id, group);
+
+  // --- เงื่อนไขพักเมื่อถึง CapsuleHouse ---
+  if (norm(id) === 'capsulehouse') {
+    // ให้เห็นหน้านี้สักครู่ จากนั้นปิด
+    clearTimeout(avTimer);
+    avTimer = setTimeout(() => {
+      closeAllModalsSafe?.();
+      // เข้าสู่โหมดพัก
+      onCooldown = true;
+
+      // เริ่มใหม่ตั้งแต่หัวแถวหลังพัก 15 นาที
+      avIndex = 0;
+      clearTimeout(avTimer);
+      avTimer = setTimeout(() => {
+        onCooldown = false;
+        stepAuto();      // resume loop
+      }, COOLDOWN_MS);
+    }, 1000); // จะให้ 0 ก็ได้ถ้าอยากปิดทันที
+
+    return; // สำคัญ: ไม่คิวจอถัดไป
+  }
+
+  // กรณีทั่วไป: คิวถัดไปตาม DISPLAY_MS
+  clearTimeout(avTimer);
+  avTimer = setTimeout(stepAuto, DISPLAY_MS);
+}
+
+// ปุ่ม ▶ Auto View
+function runDemo(){
+  const btn = document.querySelector('.menu-buttons > button:not(.dd-toggle)');
+
+  if (!window.avRunning){
+    window.avRunning = true;
+    onCooldown = false;            // เผื่อค้าง
+    avIndex = 0;
+    if (btn){ btn.innerText = '⏹ Stop'; btn.classList.add('highlight'); }
+    clearTimeout(avTimer);
+    stepAuto();
+  } else {
+    window.avRunning = false;
+    onCooldown = false;
+    clearTimeout(avTimer);
+    avTimer = null;
+    if (btn){ btn.innerText = '▶ Auto View'; btn.classList.remove('highlight'); }
+    closeAllModalsSafe?.();
+    clearAllHighlights?.();
+  }
+}
+</script>
+
+
+<!-- Modal สำหรับแสดงภาพใหญ่ -->
+<div id="imageModal" class="glass-modal">
+  <button class="close-btn" onclick="closeModal()">✖</button>
+  <img id="modalImage" class="embed-media" alt="Full screen view">
+</div>
+
+
+<script>
+  // ฟังก์ชันเปิด Modal
+  function openModal(src) {
+    const modal = document.getElementById('imageModal');
+    const modalImg = document.getElementById('modalImage');
+    modalImg.src = src;
+    modal.classList.add('active');
+    document.body.classList.add('modal-open'); // กัน scroll
+  }
+
+  // ฟังก์ชันปิด Modal
+  function closeModal() {
+    const modal = document.getElementById('imageModal');
+    modal.classList.remove('active');
+    document.body.classList.remove('modal-open');
+  }
+
+  // ครอบคลุม img modalImg1 - modalImg9
+  for (let i = 1; i <= 9; i++) {
+    const img = document.getElementById(`modalImg${i}`);
+    if (img) {
+      img.style.cursor = "pointer"; // แสดงว่าคลิกได้
+      img.addEventListener('click', function () {
+        if (img.src) openModal(img.src);
+      });
+    }
+  }
+
+  // ปิด modal เมื่อกด ESC
+  document.addEventListener("keydown", (e) => {
+    if (e.key === "Escape") closeModal();
+  });
+</script>
+
+
+<!-- ===== Bottom full-width camera (centered between left/right blocks) ===== -->
+<div id="bottomCam">
+  <button class="close-btn" onclick="document.getElementById('bottomCam').classList.remove('active')">❌</button>
+  <img id="modalImg10" alt="Bottom Camera">
+</div>
+
+
+</body>
+</html>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+

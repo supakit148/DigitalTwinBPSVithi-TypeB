@@ -1400,6 +1400,40 @@ body.modal-open {
 #CCTV9 :is(h3, h32){
   font-size: clamp(14px, 1.4vw, 24px);
 }
+
+/* === OVERRIDE (ท้ายไฟล์): รวมรูปแบบฟอนต์ name + datetime + 3 พารามิเตอร์ === */
+[id^="CCTV"]{
+  --cam-font-size: clamp(12px, 1.1vw, 18px);   /* ขนาด responsive */
+  --cam-font-weight: 700;
+  --cam-font-family: 'Orbitron', sans-serif;
+  --cam-letter-space: .02em;
+}
+
+/* ใช้กับ name (h32) และ datetime (h3) */
+[id^="CCTV"] :is(h3, h32){
+  font-family: var(--cam-font-family);
+  font-weight: var(--cam-font-weight);
+  font-size: var(--cam-font-size);
+  letter-spacing: var(--cam-letter-space);
+}
+
+/* ใช้กับพารามิเตอร์ 3 ตัวด้านขวาล่าง (pill .io) */
+[id^="CCTV"] .io{
+  font-family: var(--cam-font-family);
+  font-weight: var(--cam-font-weight);
+  font-size: var(--cam-font-size);
+  letter-spacing: var(--cam-letter-space);
+}
+
+/* ให้ตัวเลขใน .io (เช่น #in9/#out9/#occ9) รับฟอนต์จากพ่อ */
+[id^="CCTV"] .io span{ font: inherit; }
+
+/* (เลือกได้) ให้ไอคอนใน .io scale ตามขนาดฟอนต์ เพื่อความสมดุล */
+[id^="CCTV"] .io svg{ width: 1em; height: 1em; }
+
+/* ถ้าต้องการให้กล้องกลาง (#CCTV9) ใหญ่กว่าเล็กน้อย */
+#CCTV9{ --cam-font-size: clamp(14px, 1.4vw, 24px); }
+
     
   </style>
   <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700&display=swap" rel="stylesheet">
